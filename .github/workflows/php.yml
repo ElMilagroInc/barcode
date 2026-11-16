@@ -1,0 +1,45 @@
+name: PHP and GLPI 12 checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+    env:
+      BARCODE_TEST_AUTOLOAD: ${{ github.workspace }}/.glpi/vendor/autoload.php
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: ctype, curl, dom, fileinfo, gd, iconv, mbstring, xml, xmlwriter
+          coverage: none
+      - uses: actions/checkout@v4
+        with:
+          repository: glpi-project/glpi
+          # GLPI 12.0.3-dev; reproducible core API and PDF dependency checks.
+          ref: f5bd5f907158b5990a3b2d9f95e37e57c243a965
+          path: .glpi
+          persist-credentials: false
+      - name: Install GLPI runtime dependencies
+        run: composer install --working-dir=.glpi --no-dev --no-scripts --ignore-platform-reqs --prefer-dist --no-interaction
+      - name: Build GLPI 12 PDF fonts
+        run: bash .glpi/tools/build_fonts.sh
+      - name: Validate manifest and PHP syntax
+        run: |
+          composer validate --strict --no-check-lock
+          git ls-files -z '*.php' | xargs -0 -n1 php -l
+      - name: Check real GLPI class compatibility
+        run: php tests/glpi-contract.php
+      - name: Run label and authorization regressions with real TCPDF
+        run: php tests/run.php
+      - name: Install development tools
+        run: composer install --prefer-dist --no-interaction
+      - name: Check PHP style
+        run: composer lint

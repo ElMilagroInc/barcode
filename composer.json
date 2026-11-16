@@ -3,10 +3,10 @@
     "description": "GLPI barcode and QR code generation plugin",
     "type": "glpi-plugin",
     "require": {
-        "php": ">=7.4"
+        "php": ">=8.3"
     },
     "require-dev": {
-        "glpi-project/tools": "^0.5"
+        "friendsofphp/php-cs-fixer": "^3.95"
     },
     "config": {
         "optimize-autoloader": true,
@@ -16,5 +16,11 @@
         "classmap": [
             "inc/"
         ]
-    }
+    },
+    "scripts": {
+        "test": "@php tests/run.php",
+        "test:glpi": "@php tests/glpi-contract.php",
+        "lint": "php-cs-fixer fix --dry-run --diff"
+    },
+    "license": "AGPL-3.0-or-later"
 }

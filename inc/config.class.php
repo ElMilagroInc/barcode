@@ -1,291 +1,210 @@
 <?php
 
-/*
-   ------------------------------------------------------------------------
-   Barcode
-   Copyright (C) 2009-2016 by the Barcode plugin Development Team.
-
-   https://forge.indepnet.net/projects/barscode
-   ------------------------------------------------------------------------
-
-   LICENSE
-
-   This file is part of barcode plugin project.
-
-   Plugin Barcode is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Plugin Barcode is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with Plugin Barcode. If not, see <http://www.gnu.org/licenses/>.
-
-   ------------------------------------------------------------------------
-
-   @package   Plugin Barcode
-   @author    David Durieux
-   @co-author
-   @copyright Copyright (c) 2009-2016 Barcode plugin Development team
-   @license   AGPL License 3.0 or (at your option) any later version
-              http://www.gnu.org/licenses/agpl-3.0-standalone.html
-   @link      https://forge.indepnet.net/projects/barscode
-   @since     2009
-
-   ------------------------------------------------------------------------
+/**
+ * Copyright (C) 2009-2016 by the Barcode plugin Development Team.
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 if (!defined('GLPI_ROOT') && !defined('GLPI_DIR')) {
     die("Sorry. You can't access directly to this file");
 }
 
-class PluginBarcodeConfig extends CommonDBTM {
+class PluginBarcodeConfig extends CommonDBTM
+{
+    public static string $rightname = 'plugin_barcode_config';
 
-   static $rightname = 'plugin_barcode_config';
-
-   function showForm($ID, array $options = []) {
-      global $CFG_GLPI;
-
-      $pbBarcode   = new PluginBarcodeBarcode();
-      $defaultType = $this->getConfig();
-      echo "<form name='form' method='post'
-                  action='".Plugin::getWebDir('barcode')."/front/config.form.php'
-                   enctype='multipart/form-data'>";
-
-      echo "<div align='center'>";
-      echo "<table class='tab_cadre_fixe'>";
-      echo "<tr><th colspan='4'>".__('Barcode plugin configuration', 'barcode')."</th></tr>";
-      echo "</table><br>";
-
-      echo "<table class='tab_cadre_fixe'>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<th colspan='4'>".__('General configuration', 'barcode')."</th>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Type', 'barcode')."</td>";
-      echo "<td>";
-      $this->showTypeSelect($defaultType);
-      echo "</td>";
-      echo "<td colspan='2'><input type='submit' value='".__('Save')."' class='submit'></td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td class='tab_bg_1' colspan='4' align='center'><input type='submit' value='".__('Empty the cache', 'barcode')."' class='submit' name='dropCache'></td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<th colspan='4'>".__('Company logo', 'barcode')."</th>";
-      echo "</tr>";
-
-      if (file_exists(GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png')) {
-         echo "<tr class='tab_bg_1'>";
-         echo "<td colspan='4' align='center'>";
-         echo "<img src='".Plugin::getWebDir('barcode')."/front/document.send.php?file=barcode/logo.png'
-               width='300'/>";
-         echo "</td>";
-         echo "</tr>";
-
-         echo "<tr class='tab_bg_1'>";
-         echo "<td class='tab_bg_1' colspan='4' align='center'><input type='submit' value='".__('Delete the logo', 'barcode')."' class='submit' name='dropLogo'></td>";
-         echo "</tr>";
-      }
-
-      echo "<tr class='tab_bg_1'>";
-      echo "<td colspan='2' align='center'><input type='file' name='logo' value='' /></td>";
-      echo "<td colspan='2'><input type='submit' value='".__('Save')."' class='submit'></td>";
-      echo "</tr>";
-
-      echo "</table>";
-      echo "</div>";
-      Html::closeForm();
-
-      foreach ($pbBarcode->getCodeTypes() as $type) {
-         echo '<br>';
-         $this->showFormConfigType($type);
-      }
-
-      // ── Custom label sizes (DB-managed) ──────────────────────────────────
-      // Wrapped in a catch-all so any error here cannot blank-500 the whole
-      // config page; instead it is displayed inline for diagnosis.
-      try {
-         if (class_exists('PluginBarcodeCustomSize')) {
+    public function showForm($ID, array $options = [])
+    {
+        $types = (new PluginBarcodeBarcode())->getCodeTypes();
+        $sections = ['general' => __('General configuration', 'barcode')]
+            + array_combine($types, $types)
+            + ['sizes' => __('Custom label sizes', 'barcode')];
+        $section = (string) ($_GET['section'] ?? 'general');
+        if (!isset($sections[$section])) {
+            $section = 'general';
+        }
+        echo '<nav class="nav nav-tabs mb-3" aria-label="' . PluginBarcodeLabel::escape(__('Barcode plugin configuration', 'barcode')) . '">';
+        foreach ($sections as $key => $label) {
+            echo '<a class="nav-link' . ($key === $section ? ' active' : '') . '" href="'
+                . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/config.php?section=' . urlencode($key))
+                . '"' . ($key === $section ? ' aria-current="page"' : '') . '>' . PluginBarcodeLabel::escape($label) . '</a>';
+        }
+        echo '</nav>';
+        if ($section === 'sizes') {
             PluginBarcodeCustomSize::showManagementForm();
-         } else {
-            echo "<br><div class='alert alert-warning'>"
-               . "PluginBarcodeCustomSize class not loaded — check setup.php include path."
-               . "</div>";
-         }
-      } catch (\Throwable $e) {
-         echo "<br><div class='alert alert-danger' style='padding:10px;font-family:monospace;text-align:left'>"
-            . "<strong>Custom sizes section failed:</strong><br>"
-            . htmlspecialchars($e->getMessage()) . "<br>"
-            . "<small>" . htmlspecialchars($e->getFile()) . ":" . (int)$e->getLine() . "</small>"
-            . "</div>";
-      }
-   }
+        } elseif ($section !== 'general') {
+            $this->showFormConfigType($section);
+        } else {
+            $this->showGeneralForm();
+        }
+    }
 
-   function getConfig() {
-      $pbconf = new PluginBarcodeConfig();
-      if ($pbconf->getFromDB(1)) {
-         $type = $pbconf->fields['type'];
-      } else {
-         $type = 'code128';
-      }
-      return $type;
-   }
+    private function showGeneralForm(): void
+    {
+        $settings = PluginBarcodeLabel::settings();
+        echo '<form method="post" enctype="multipart/form-data" action="'
+            . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/config.form.php') . '">';
+        echo '<table class="tab_cadre_fixe"><tr><th colspan="2">'
+            . __('Barcode plugin configuration', 'barcode') . '</th></tr>';
+        echo '<tr><td>' . __('Default barcode type', 'barcode') . '</td><td>';
+        // Show all types here, even when disabled, so administrators can re-enable them.
+        $this->showTypeSelect($this->getConfig(), [], true);
+        echo '</td></tr>';
+        $labels = [
+            'enable_barcode' => __('Enable barcodes', 'barcode'),
+            'enable_qrcode' => __('Enable QR codes', 'barcode'),
+            'prompt_settings' => __('Prompt for settings before generation', 'barcode'),
+            'auto_print' => __('Request the print dialog when opening a PDF', 'barcode'),
+            'show_logo' => __('Show company logo above codes', 'barcode'),
+            'border' => __('Display border', 'barcode'),
+            'displaylabels' => __('Display field labels', 'barcode'),
+        ];
+        foreach ($labels as $key => $label) {
+            echo '<tr><td>' . PluginBarcodeLabel::escape($label) . '</td><td>';
+            Dropdown::showYesNo($key, (int) $settings[$key]);
+            echo '</td></tr>';
+        }
+        echo '<tr><td>' . __('Custom text below codes (plain text)', 'barcode') . '</td><td><textarea name="custom_text" class="form-control" maxlength="500" rows="3">'
+            . PluginBarcodeLabel::escape((string) $settings['custom_text']) . '</textarea></td></tr>';
+        echo '<tr><td colspan="2">' . __('Automatic printing depends on the browser PDF viewer. Text is printed literally; HTML and template expressions are not evaluated.', 'barcode') . '</td></tr>';
+        echo '<tr><th colspan="2">' . __('QR code defaults: encode / display', 'barcode') . '</th></tr>';
+        foreach ([
+            'serialnumber' => __('Serial number'), 'inventorynumber' => __('Inventory number'),
+            'id' => __('ID'), 'uuid' => __('UUID'), 'name' => __('Name'),
+            'url' => __('URL'), 'qrcodedate' => __('Date'),
+        ] as $key => $label) {
+            echo '<tr><td>' . PluginBarcodeLabel::escape($label) . '</td><td>';
+            Dropdown::showYesNo($key, (int) $settings[$key]);
+            Dropdown::showYesNo('display' . $key, (int) $settings['display' . $key]);
+            echo '</td></tr>';
+        }
+        echo '<tr><td>' . __('URL by inventory number', 'barcode') . '</td><td>';
+        Dropdown::showYesNo('inventorynumberURL', (int) $settings['inventorynumberURL']);
+        echo '</td></tr><tr><th colspan="2">' . __('Company logo', 'barcode') . '</th></tr>';
+        if (is_file(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png')) {
+            echo '<tr><td colspan="2"><img style="max-width:300px;max-height:100px" alt="'
+                . PluginBarcodeLabel::escape(__('Company logo', 'barcode')) . '" src="'
+                . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/document.send.php?file=barcode/logo.png')
+                . '"><button type="submit" name="dropLogo" value="1" class="btn btn-outline-secondary">'
+                . __('Delete the logo', 'barcode') . '</button></td></tr>';
+        }
+        echo '<tr><td colspan="2"><input type="file" name="logo" accept="image/png"> PNG, 2 MiB, 2000 × 2000 px maximum</td></tr>';
+        echo '<tr><td colspan="2">' . Html::submit(__('Save'), ['name' => 'save']) . '</td></tr></table>';
+        Html::closeForm();
+    }
 
+    public function getConfig(): string
+    {
+        $pbconf = new PluginBarcodeConfig();
+        if ($pbconf->getFromDB(1)) {
+            $type = $pbconf->fields['type'];
+        } else {
+            $type = 'code128';
+        }
+        return $type;
+    }
 
+    public function showFormConfigType($p_type = null): void
+    {
+        $pbBarcode = new PluginBarcodeBarcode();
 
-   function showFormConfigType($p_type = null) {
-      global $CFG_GLPI;
+        if (is_null($p_type)) {
+            $type = $this->getConfig();
+        } else {
+            $type = $p_type;
+        }
 
-      $pbBarcode = new PluginBarcodeBarcode();
+        $config = $this->getConfigType($type);
+        echo "<form name='form' method='post'
+            action='" . Plugin::getWebDir('barcode') . "/front/config_type.form.php'>";
+        echo "<input type='hidden' name='type' value='" . PluginBarcodeLabel::escape((string) $type) . "'>";
+        echo "<div align='center'>";
+        echo "<table class='tab_cadre_fixe' >";
 
-      if (is_null($p_type)) {
-         $type = $this->getConfig();
-      } else {
-         $type = $p_type;
-      }
+        echo "<tr><th colspan='4'>" . PluginBarcodeLabel::escape((string) $type) . "</th></tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Page size', 'barcode') . "</td><td>";
+        $pbBarcode->showSizeSelect($config['size']);
+        echo "</td>";
+        echo "<td>" . __('Orientation', 'barcode') . "</td><td>";
+        $pbBarcode->showOrientationSelect($config['orientation']);
+        echo "</td>";
+        echo "</tr>";
+        echo "<tr><th colspan='4'>" . __('Margins', 'barcode') . "</th></tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Top', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginTop' value='" . PluginBarcodeLabel::escape((string) $config['marginTop']) . "'>";
+        echo "</td>";
+        echo "<td>" . __('Bottom', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginBottom' value='" . PluginBarcodeLabel::escape((string) $config['marginBottom']) . "'>";
+        echo "</td>";
+        echo "</tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Left', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginLeft' value='" . PluginBarcodeLabel::escape((string) $config['marginLeft']) . "'>";
+        echo "</td>";
+        echo "<td>" . __('Right', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginRight' value='" . PluginBarcodeLabel::escape((string) $config['marginRight']) . "'>";
+        echo "</td>";
+        echo "</tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Inner horizontal', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginHorizontal' value='" . PluginBarcodeLabel::escape((string) $config['marginHorizontal']) . "'>";
+        echo "</td>";
+        echo "<td>" . __('Inner vertical', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='marginVertical' value='" . PluginBarcodeLabel::escape((string) $config['marginVertical']) . "'>";
+        echo "</td>";
+        echo "</tr>";
+        echo "<tr><th colspan='4'>" . __('Barcodes sizes', 'barcode') . "</th></tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Maximum width', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='maxCodeWidth' value='" . PluginBarcodeLabel::escape((string) $config['maxCodeWidth']) . "'>";
+        echo "</td>";
+        echo "<td>" . __('Maximum height', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='maxCodeHeight' value='" . PluginBarcodeLabel::escape((string) $config['maxCodeHeight']) . "'>";
+        echo "</td>";
+        echo "</tr>";
+        echo "<tr><th colspan='4'>" . __('Text display options', 'barcode') . "</th></tr>";
+        echo "<tr class='tab_bg_1'>";
+        echo "<td>" . __('Text size', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='txtSize' value='" . PluginBarcodeLabel::escape((string) $config['txtSize']) . "'>";
+        echo "</td>";
+        echo "<td>" . __('Text spacing between lines', 'barcode') . "</td><td>";
+        echo "<input type='text' size='20' name='txtSpacing' value='" . PluginBarcodeLabel::escape((string) $config['txtSpacing']) . "'>";
+        echo "</td>";
+        echo "</tr>";
 
-      $config = $this->getConfigType($type);
-      echo "<form name='form' method='post'
-            action='".Plugin::getWebDir('barcode')."/front/config_type.form.php'>";
-      echo "<input type='hidden' name='type' value='".$type."'>";
-      echo "<div align='center'>";
-      echo "<table class='tab_cadre_fixe' >";
+        echo "<tr><td class='tab_bg_1' colspan='4' align='center'><input type='submit' value='" . __('Save') . "' class='submit'></td></tr>";
+        echo "</table>";
+        echo "</div>";
+        Html::closeForm();
+    }
 
-      echo "<tr><th colspan='4'>".$type."</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Page size', 'barcode')."</td><td>";
-      $pbBarcode->showSizeSelect($config['size']);
-      echo "</td>";
-      echo "<td>".__('Orientation', 'barcode')."</td><td>";
-      $pbBarcode->showOrientationSelect($config['orientation']);
-      echo "</td>";
-      echo "</tr>";
-      echo "<tr><th colspan='4'>".__('Margins', 'barcode')."</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Top', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginTop' value='".$config['marginTop']."'>";
-      echo "</td>";
-      echo "<td>".__('Bottom', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginBottom' value='".$config['marginBottom']."'>";
-      echo "</td>";
-      echo "</tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Left', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginLeft' value='".$config['marginLeft']."'>";
-      echo "</td>";
-      echo "<td>".__('Right', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginRight' value='".$config['marginRight']."'>";
-      echo "</td>";
-      echo "</tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Inner horizontal', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginHorizontal' value='".$config['marginHorizontal']."'>";
-      echo "</td>";
-      echo "<td>".__('Inner vertical', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='marginVertical' value='".$config['marginVertical']."'>";
-      echo "</td>";
-      echo "</tr>";
-      echo "<tr><th colspan='4'>".__('Barcodes sizes', 'barcode')."</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Maximum width', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='maxCodeWidth' value='".$config['maxCodeWidth']."'>";
-      echo "</td>";
-      echo "<td>".__('Maximum height', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='maxCodeHeight' value='".$config['maxCodeHeight']."'>";
-      echo "</td>";
-      echo "</tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('URL', 'barcode') . "</td><td>";
-      echo "<select> URL:";
-      echo "<option value='id'>".__('By ID', 'barcode')."</option>";
-      echo "<option value='serial'>".__('By serial number', 'barcode')."</option>";
-      echo "</select>";
-      echo "</td>";
-      echo "</tr>";
+    public function getConfigType($p_type = null): array
+    {
+        $type = $p_type ?? $this->getConfig();
+        $defaults = [
+            'type' => $type, 'size' => 'A4', 'orientation' => 'Portrait',
+            'marginTop' => 30, 'marginBottom' => 30, 'marginLeft' => 30, 'marginRight' => 30,
+            'marginHorizontal' => 25, 'marginVertical' => 30,
+            'maxCodeWidth' => 110, 'maxCodeHeight' => $type === 'QRcode' ? 100 : 70,
+            'txtSize' => 8, 'txtSpacing' => 3,
+        ];
+        $config = new PluginBarcodeConfigType();
+        if ($config->getFromDBByCrit(['type' => $type])) {
+            return array_replace($defaults, array_intersect_key($config->fields, $defaults));
+        }
+        return $defaults;
+    }
 
-      echo "<tr><th colspan='4'>".__('Text display options', 'barcode')."</th></tr>";
-      echo "<tr class='tab_bg_1'>";
-      echo "<td>".__('Text size', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='txtSize' value='".$config['txtSize']."'>";
-      echo "</td>";
-      echo "<td>".__('Text spacing between lines', 'barcode')."</td><td>";
-      echo "<input type='text' size='20' name='txtSpacing' value='".$config['txtSpacing']."'>";
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr><td class='tab_bg_1' colspan='4' align='center'><input type='submit' value='".__('Save')."' class='submit'></td></tr>";
-      echo "</table>";
-      echo "</div>";
-      Html::closeForm();
-   }
-
-   function getConfigType($p_type = null) {
-      if (is_null($p_type)) {
-         $p_type=$this->getConfig();
-      }
-      $pbcconf = new PluginBarcodeConfig_Type();
-      if ($res = array_keys($pbcconf->find(['type' => $p_type]))) {
-         $id = $res[0];
-         $pbcconf->getFromDB($id);
-         $config['type']               = $pbcconf->fields['type'];
-         $config['size']               = $pbcconf->fields['size'];
-         $config['orientation']        = $pbcconf->fields['orientation'];
-         $config['marginTop']          = $pbcconf->fields['marginTop'];
-         $config['marginBottom']       = $pbcconf->fields['marginBottom'];
-         $config['marginLeft']         = $pbcconf->fields['marginLeft'];
-         $config['marginRight']        = $pbcconf->fields['marginRight'];
-         $config['marginHorizontal']   = $pbcconf->fields['marginHorizontal'];
-         $config['marginVertical']     = $pbcconf->fields['marginVertical'];
-         $config['maxCodeWidth']       = $pbcconf->fields['maxCodeWidth'];
-         $config['maxCodeHeight']      = $pbcconf->fields['maxCodeHeight'];
-         $config['txtSize']            = $pbcconf->fields['txtSize'];
-         $config['txtSpacing']         = $pbcconf->fields['txtSpacing'];
-      } else {
-         $config['type']               = 'code128';
-         $config['size']               = 'A4';
-         $config['orientation']        = 'Portrait';
-         $config['marginTop']          = 30;
-         $config['marginBottom']       = 30;
-         $config['marginLeft']         = 30;
-         $config['marginRight']        = 30;
-         $config['marginHorizontal']   = 25;
-         $config['marginVertical']     = 30;
-         $config['maxCodeWidth']       = 110;
-         $config['maxCodeHeight']      = 70;
-         $config['txtSize']            = 8;
-         $config['txtSpacing']         = 3;
-      }
-      return $config;
-   }
-
-
-
-   function showTypeSelect($p_type = null, $used = []) {
-
-      $options = [
-                  'width' => '100',
-                  'used'  => $used
-                 ];
-      if (!is_null($p_type)) {
-         $options['value'] = $p_type;
-      }
-      Dropdown::showFromArray("type",
-                              ['Code39'    => __('code39', 'barcode'),
-                               'code128'   => __('code128', 'barcode'),
-                               'ean13'     => __('ean13', 'barcode'),
-                               'int25'     => __('int25', 'barcode'),
-                               'postnet'   => __('postnet', 'barcode'),
-                               'upca'      => __('upca', 'barcode'),
-                               'QRcode'    => __('QRcode', 'barcode')],
-                               $options
-                            );
-   }
+    public function showTypeSelect($p_type = null, $used = [], bool $includeDisabled = false): void
+    {
+        $types = (new PluginBarcodeBarcode())->getCodeTypes();
+        if (!$includeDisabled) {
+            $types = array_values(array_filter($types, [PluginBarcodeLabel::class, 'isEnabled']));
+        }
+        Dropdown::showFromArray('type', array_combine($types, $types), [
+            'width' => '100%', 'used' => $used, 'value' => $p_type,
+        ]);
+    }
 }

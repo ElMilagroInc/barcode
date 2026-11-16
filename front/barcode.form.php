@@ -1,35 +1,33 @@
 <?php
 
-/*
-   ------------------------------------------------------------------------
-   Barcode
-   Copyright (C) 2009-2024 by the Barcode plugin Development Team.
-   https://forge.indepnet.net/projects/barcode
-   ------------------------------------------------------------------------
-   LICENSE: AGPL License 3.0 or (at your option) any later version
-   ------------------------------------------------------------------------
+/**
+ * Copyright (C) 2009-2024 by the Barcode plugin Development Team.
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-
-// GLPI 10/11 compatibility: on GLPI 11 the bootstrap is handled by the
-// Symfony router (LegacyFileLoadController); on GLPI 10 the legacy entry
-// point must be included explicitly, otherwise GLPI core classes are not
-// available when this file is required directly.
-if (!class_exists('Session')) {
-   include('../../../inc/includes.php');
+Session::checkRight('plugin_barcode_barcode', CREATE);
+$barcode = new PluginBarcodeBarcode();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    Html::header(__('Barcode', 'barcode'), $_SERVER['PHP_SELF'], 'tools', PluginBarcodeBarcode::class);
+    echo '<form method="post" target="_blank" action="' . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/barcode.form.php') . '">';
+    echo '<label>' . __('Code', 'barcode') . ' <input type="text" name="code" maxlength="2000" required></label>';
+    (new PluginBarcodeConfig())->showTypeSelect((new PluginBarcodeConfig())->getConfig(), ['QRcode']);
+    echo '<label>' . __('Number of copies', 'barcode') . ' <input type="number" name="nb" value="1" min="1" max="1000"></label>';
+    echo Html::submit(__('Generate label', 'barcode'));
+    Html::closeForm();
+    Html::footer();
+    return;
 }
-
-if (!isset($_POST["length"]))      { $_POST["length"]      = ""; }
-if (!isset($_POST["prefixe"]))     { $_POST["prefixe"]     = ""; }
-if (!isset($_POST["size"]))        { $_POST["size"]        = ""; }
-if (!isset($_POST["format"]))      { $_POST["format"]      = ""; }
-
-$barcode  = new PluginBarcodeBarcode();
-$pdfPath  = $barcode->printPDF($_POST);
-
-// Register the tmp file and build a token URL — send.php will serve+delete it.
-$token = PluginBarcodeBarcode::registerTmpPdf($pdfPath);
-$msg   = "<a href='" . Plugin::getWebDir('barcode') . '/front/send.php?token=' . urlencode($token)
-       . "' target='_blank' rel='noopener noreferrer'>" . __('Generated file', 'barcode') . "</a>";
-Session::addMessageAfterRedirect($msg);
-
-Html::back();
+try {
+    $type = (string) ($_POST['type'] ?? 'code128');
+    $options = PluginBarcodeLabel::parameters($type);
+    $options['code'] = (string) ($_POST['code'] ?? '');
+    $options['nb'] = (int) ($_POST['nb'] ?? 1);
+    $path = $barcode->printPDF($options);
+    if (!$path) {
+        throw new RuntimeException('No label was generated.');
+    }
+    $token = PluginBarcodeBarcode::registerTmpPdf($path);
+    return new Symfony\Component\HttpFoundation\RedirectResponse(Plugin::getWebDir('barcode') . '/front/send.php?token=' . $token);
+} catch (InvalidArgumentException | RuntimeException $e) {
+    Html::displayErrorAndDie(PluginBarcodeLabel::escape($e->getMessage()), true);
+}
