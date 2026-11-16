@@ -1,62 +1,39 @@
 <?php
 
-/*
-   ------------------------------------------------------------------------
-   Barcode
-   Copyright (C) 2009-2016 by the Barcode plugin Development Team.
-
-   https://forge.indepnet.net/projects/barscode
-   ------------------------------------------------------------------------
-
-   LICENSE
-
-   This file is part of barcode plugin project.
-
-   Plugin Barcode is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Plugin Barcode is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with Plugin Barcode. If not, see <http://www.gnu.org/licenses/>.
-
-   ------------------------------------------------------------------------
-
-   @package   Plugin Barcode
-   @author    David Durieux
-   @co-author
-   @copyright Copyright (c) 2009-2016 Barcode plugin Development team
-   @license   AGPL License 3.0 or (at your option) any later version
-              http://www.gnu.org/licenses/agpl-3.0-standalone.html
-   @link      https://forge.indepnet.net/projects/barscode
-   @since     2009
-
-   ------------------------------------------------------------------------
+/**
+ * Copyright (C) 2009-2016 by the Barcode plugin Development Team.
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-
-// ----------------------------------------------------------------------
-// Original Author of file: Vincent Mazzoni
-// Purpose of file:
-// ----------------------------------------------------------------------
-
-// GLPI 10/11 compatibility: on GLPI 11 the bootstrap is handled by the
-// Symfony router (LegacyFileLoadController); on GLPI 10 the legacy entry
-// point must be included explicitly, otherwise GLPI core classes are not
-// available when this file is required directly.
-if (!class_exists('Session')) {
-   include('../../../inc/includes.php');
+Session::checkRight('config', UPDATE);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    return new Symfony\Component\HttpFoundation\Response('', 405, ['Allow' => 'POST']);
 }
-
-if (isset($_POST['type'])) {
-   $pbcconf = new PluginBarcodeConfig_Type();
-   if ($res = array_keys($pbcconf->find(['type' => $_POST['type']]))) {
-      $_POST['id'] = $res[0];
-      $pbcconf->update($_POST);
-   }
+try {
+    $type = (string) ($_POST['type'] ?? '');
+    if (!in_array($type, (new PluginBarcodeBarcode())->getCodeTypes(), true)) {
+        throw new InvalidArgumentException('Invalid code type.');
+    }
+    $input = ['type' => $type];
+    foreach (['marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginHorizontal',
+        'marginVertical', 'maxCodeWidth', 'maxCodeHeight', 'txtSize', 'txtSpacing'] as $field) {
+        $minimum = in_array($field, ['maxCodeWidth', 'maxCodeHeight', 'txtSize'], true) ? 1 : 0;
+        $value = filter_var($_POST[$field] ?? null, FILTER_VALIDATE_INT);
+        if ($value === false || $value < $minimum || $value > 2000) {
+            throw new InvalidArgumentException('Dimensions must be whole numbers between 0 and 2000 points; code and font sizes must be positive.');
+        }
+        $input[$field] = $value;
+    }
+    $input['size'] = PluginBarcodeBarcode::validatePageSize((string) ($_POST['size'] ?? ''));
+    $input['orientation'] = (string) ($_POST['orientation'] ?? '');
+    if (!in_array($input['orientation'], ['Portrait', 'Landscape'], true)) {
+        throw new InvalidArgumentException('Invalid orientation.');
+    }
+    $config = new PluginBarcodeConfigType();
+    if ($config->getFromDBByCrit(['type' => $type])) {
+        $input['id'] = $config->getID();
+        $config->update($input);
+    }
+} catch (InvalidArgumentException $e) {
+    Session::addMessageAfterRedirect(PluginBarcodeLabel::escape($e->getMessage()), false, ERROR);
 }
 Html::back();

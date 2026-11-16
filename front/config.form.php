@@ -1,80 +1,72 @@
 <?php
 
-/*
-   ------------------------------------------------------------------------
-   Barcode
-   Copyright (C) 2009-2016 by the Barcode plugin Development Team.
-
-   https://forge.indepnet.net/projects/barscode
-   ------------------------------------------------------------------------
-
-   LICENSE
-
-   This file is part of barcode plugin project.
-
-   Plugin Barcode is free software: you can redistribute it and/or modify
-   it under the terms of the GNU Affero General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Plugin Barcode is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-   GNU Affero General Public License for more details.
-
-   You should have received a copy of the GNU Affero General Public License
-   along with Plugin Barcode. If not, see <http://www.gnu.org/licenses/>.
-
-   ------------------------------------------------------------------------
-
-   @package   Plugin Barcode
-   @author    David Durieux
-   @co-author
-   @copyright Copyright (c) 2009-2016 Barcode plugin Development team
-   @license   AGPL License 3.0 or (at your option) any later version
-              http://www.gnu.org/licenses/agpl-3.0-standalone.html
-   @link      https://forge.indepnet.net/projects/barscode
-   @since     2009
-
-   ------------------------------------------------------------------------
+/**
+ * Copyright (C) 2009-2016 by the Barcode plugin Development Team.
+ * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-
-// GLPI 10/11 compatibility: on GLPI 11 the bootstrap is handled by the
-// Symfony router (LegacyFileLoadController); on GLPI 10 the legacy entry
-// point must be included explicitly, otherwise GLPI core classes are not
-// available when this file is required directly.
-if (!class_exists('Session')) {
-   include('../../../inc/includes.php');
+Session::checkRight('config', UPDATE);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    return new Symfony\Component\HttpFoundation\Response('', 405, ['Allow' => 'POST']);
 }
 
-if (isset($_POST['dropCache'])) {
-   $dir = GLPI_PLUGIN_DOC_DIR.'/barcode';
-   if (is_dir($dir)) {
-      if ($dh = opendir($dir)) {
-         while (($file = readdir($dh)) !== false) {
-            if ($file != "." && $file != ".." && $file != "logo.png") {
-               unlink($dir.'/'.$file);
+try {
+    $logoPath = GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png';
+    if (isset($_POST['dropLogo'])) {
+        if (is_file($logoPath) && !unlink($logoPath)) {
+            throw new RuntimeException('Unable to remove the logo.');
+        }
+    } else {
+        $type = (string) ($_POST['type'] ?? 'code128');
+        if (!in_array($type, (new PluginBarcodeBarcode())->getCodeTypes(), true)) {
+            throw new InvalidArgumentException('Invalid barcode type.');
+        }
+        $values = [];
+        foreach (PluginBarcodeLabel::defaults() as $key => $default) {
+            if ($key === 'custom_text') {
+                $text = str_replace("\r\n", "\n", trim((string) ($_POST[$key] ?? '')));
+                if (mb_strlen($text) > 500 || substr_count($text, "\n") > 4) {
+                    throw new InvalidArgumentException('Custom text is limited to 500 characters and five lines.');
+                }
+                $values[$key] = $text;
+            } else {
+                $values[$key] = (int) (($_POST[$key] ?? 0) === '1');
             }
-         }
-         closedir($dh);
-      }
-   }
-   Session::addMessageAfterRedirect(__('The cache has been emptied.', 'barcode'));
-} else if (isset($_POST['dropLogo'])) {
-   if (is_file(GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png')) {
-      unlink(GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png');
-   }
-   Session::addMessageAfterRedirect(__('The logo has been removed.', 'barcode'));
-} else if (!empty($_FILES['logo']['name'])) {
-   if (is_file(GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png')) {
-      @unlink(GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png');
-   }
-   // Move
-   rename($_FILES['logo']['tmp_name'], GLPI_PLUGIN_DOC_DIR.'/barcode/logo.png');
-
-} else if (isset($_POST['type'])) {
-   $pbconf = new PluginBarcodeConfig();
-   $_POST['id']=1;
-   $pbconf->update($_POST);
+        }
+        // Validate and re-encode the upload before changing any saved settings.
+        $upload = $_FILES['logo'] ?? null;
+        if ($upload !== null && $upload['error'] !== UPLOAD_ERR_NO_FILE) {
+            if ($upload['error'] !== UPLOAD_ERR_OK || $upload['size'] > 2 * 1024 * 1024
+                || !is_uploaded_file($upload['tmp_name'])) {
+                throw new InvalidArgumentException('Upload a PNG file no larger than 2 MiB.');
+            }
+            $info = getimagesize($upload['tmp_name']);
+            if (!$info || $info[2] !== IMAGETYPE_PNG || $info[0] > 2000 || $info[1] > 2000) {
+                throw new InvalidArgumentException('The logo must be a PNG no larger than 2000 × 2000 pixels.');
+            }
+            if (!function_exists('imagecreatefrompng')) {
+                throw new RuntimeException('The PHP GD extension is required to upload logos.');
+            }
+            $image = imagecreatefrompng($upload['tmp_name']);
+            if ($image === false) {
+                throw new InvalidArgumentException('Invalid PNG image.');
+            }
+            imagesavealpha($image, true);
+            $temporary = tempnam(dirname($logoPath), 'logo_');
+            try {
+                if ($temporary === false || !imagepng($image, $temporary) || !rename($temporary, $logoPath)) {
+                    throw new RuntimeException('Unable to save the logo.');
+                }
+            } finally {
+                if ($temporary !== false && is_file($temporary)) {
+                    unlink($temporary);
+                }
+            }
+        }
+        Config::setConfigurationValues(PluginBarcodeLabel::CONTEXT, $values);
+        (new PluginBarcodeConfig())->update(['id' => 1, 'type' => $type]);
+    }
+    Session::addMessageAfterRedirect(__('Configuration saved.', 'barcode'));
+} catch (InvalidArgumentException | RuntimeException $e) {
+    Session::addMessageAfterRedirect(PluginBarcodeLabel::escape($e->getMessage()), false, ERROR);
 }
 Html::back();
