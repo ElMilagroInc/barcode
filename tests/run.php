@@ -125,6 +125,10 @@ class Config
     {
         return self::$settings;
     }
+    public static function setConfigurationValues($context, array $values)
+    {
+        self::$settings = array_replace(self::$settings, $values);
+    }
 }
 class Session
 {
@@ -435,6 +439,42 @@ try {
         check(str_contains(implode(' ', Session::$messages), 'Unable to save the barcode settings'), 'Failed database save is reported instead of silently reverting');
     }
     CommonDBTM::$updateResult = true;
+    $textOptions = PluginBarcodeLabel::validateTextOptions(['custom_text_size' => '3.5', 'custom_text_gap' => '0']);
+    check($textOptions === ['custom_text_size' => 3.5, 'custom_text_gap' => 0.0], 'Fractional custom font size and zero gap are accepted');
+    rejects(fn () => PluginBarcodeLabel::validateTextOptions(['custom_text_size' => '0.5']), 'Custom font cannot be smaller than one point');
+    rejects(fn () => PluginBarcodeLabel::validateTextOptions(['custom_text_gap' => '-1']), 'Custom gap cannot be negative');
+    rejects(fn () => PluginBarcodeLabel::validateTextOptions(['custom_text_size' => 'NaN']), 'Non-finite font sizes are rejected');
+    $measure = new TCPDF();
+    $measure->setCellPaddings(0, 0, 0, 0);
+    $measure->setCellHeightRatio(1.0);
+    $tight = PluginBarcodeBarcode::layoutText($measure, 40, ['EMI-0597'], ['support.el-milagro.net'], 6, 3, 3, 0);
+    check($tight['runs'][0]['size'] === 6.0 && $tight['runs'][1]['size'] === 3.0, 'Custom text is smaller without changing the asset number');
+    check(abs($tight['runs'][1]['y'] - $tight['runs'][0]['height']) < 0.00001, 'Zero custom gap places text directly after the asset number even with asset line spacing');
+    $spaced = PluginBarcodeBarcode::layoutText($measure, 40, ['EMI-0597'], ['support.el-milagro.net'], 6, 3, 3, 2);
+    check(abs($spaced['height'] - $tight['height'] - 2) < 0.00001, 'Custom gap contributes to measured label height');
+    $wrapped = PluginBarcodeBarcode::layoutText($measure, 5, ['EMI-0597'], ['A long custom line that must wrap'], 6, 0, 3, 0);
+    check($wrapped['runs'][1]['height'] > $tight['runs'][1]['height'], 'Wrapped custom text reserves its actual height');
+    Config::$settings = [];
+    $_POST = array_map('strval', PluginBarcodeLabel::defaults());
+    $_POST = array_replace($_POST, ['type' => 'code128', 'custom_text' => 'support.el-milagro.net', 'custom_text_size' => '3.5', 'custom_text_gap' => '0.25']);
+    $_FILES = [];
+    Session::$messages = [];
+    try {
+        require dirname(__DIR__) . '/front/config.form.php';
+    } catch (\Glpi\Exception\RedirectException $e) {
+        check(Config::$settings['custom_text_size'] === 3.5 && Config::$settings['custom_text_gap'] === 0.25, 'General settings save preserves numeric text controls instead of converting them to booleans');
+    }
+    $_POST['custom_text_size'] = '-1';
+    try {
+        require dirname(__DIR__) . '/front/config.form.php';
+    } catch (\Glpi\Exception\RedirectException $e) {
+        check(Config::$settings['custom_text_size'] === 3.5 && str_contains(implode(' ', Session::$messages), 'Custom text size'), 'Invalid custom text options report an error and retain saved settings');
+    }
+    $styledPath = $barcode->printPDF(array_replace($saved, ['code' => 'EMI-0597']));
+    check(is_file($styledPath), 'Custom font and gap render on a short custom paper size');
+    if (getenv('BARCODE_TEST_TEXT_SAMPLE')) {
+        copy($styledPath, getenv('BARCODE_TEST_TEXT_SAMPLE'));
+    }
     echo "Passed $count regression checks with real TCPDF.\n";
 } finally {
     foreach (glob(GLPI_TMP_DIR . '/*.pdf') ?: [] as $file) {

@@ -42,6 +42,11 @@ General settings include:
 - Plain custom text below every label, including Unicode and up to five lines
   (500 characters total). Text is escaped in settings and drawn with PDF text
   primitives: HTML, JavaScript and template expressions are never evaluated.
+  **Custom text size** accepts fractional points (1–72; 0 inherits the asset
+  text size). **Gap before custom text** accepts 0–72 points; 0 places it
+  directly below the asset text. These General settings are independent of the
+  symbology’s asset text size and line spacing and also apply to QR labels.
+  Try 3 or 3.5 points and a 0-point gap for a compact support URL.
 - PNG logo above the symbol, with a separate visibility switch. Uploads are
   validated and re-encoded, limited to 2 MiB and 2000 × 2000 pixels. PHP GD is
   required for uploading logos. The logo never overlays the barcode or QR data.
@@ -67,7 +72,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.5).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.1.0).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 
