@@ -310,6 +310,7 @@ class PluginBarcodeBarcode
         $hasLogo  = false;
         $logoW    = 0.0;
         $logoH_mm = 0.0;
+        $logoData = '';
 
         // The logo has its own space ABOVE the configured symbol height.
         // A short thermal barcode must not silently suppress the logo or have
@@ -318,9 +319,21 @@ class PluginBarcodeBarcode
         $maxLogoH = 10.0;
         $maxLogoW = $codeW * 0.60;
         if (!empty($settings['show_logo']) && is_file($logoPath)) {
-            $imgInfo = getimagesize($logoPath);
-            if (!$imgInfo || $imgInfo[0] <= 0 || $imgInfo[1] <= 0) {
-                throw new InvalidArgumentException('The stored company logo is invalid. Upload a PNG logo again in Barcode configuration.');
+            if (!is_readable($logoPath)) {
+                throw new InvalidArgumentException('Unable to read the company logo (logo.png). Re-upload the PNG logo or disable logo display in Barcode configuration.');
+            }
+            // Read only the plugin's fixed, administrator-uploaded image. TCPDF 7
+            // rejects data directories outside its own local-file allowlist.
+            // Its documented @data image API avoids changing that allowlist.
+            $logoData = @file_get_contents($logoPath, false, null, 0, 2 * 1024 * 1024 + 1);
+            if ($logoData === false) {
+                throw new InvalidArgumentException('Unable to read the company logo (logo.png). Re-upload the PNG logo or disable logo display in Barcode configuration.');
+            }
+            $imgInfo = @getimagesizefromstring($logoData);
+            if (strlen($logoData) > 2 * 1024 * 1024 || !$imgInfo
+                || $imgInfo[2] !== IMAGETYPE_PNG || $imgInfo[0] <= 0 || $imgInfo[1] <= 0
+                || $imgInfo[0] > 2000 || $imgInfo[1] > 2000) {
+                throw new InvalidArgumentException('The company logo must be a PNG no larger than 2 MiB and 2000 × 2000 pixels. Re-upload the logo or disable logo display in Barcode configuration.');
             }
             $ratio = $imgInfo[0] / $imgInfo[1];
             $logoW = min($maxLogoW, $maxLogoH * $ratio);
@@ -413,7 +426,16 @@ class PluginBarcodeBarcode
             // ── Logo (top of cell, centred) ───────────────────────────────────────
             if ($hasLogo) {
                 $lx = $x + ($codeW - $logoW) / 2.0;
-                $pdf->Image($logoPath, $lx, $drawY, $logoW, $logoH_mm, 'PNG', '', '', false, 300);
+                try {
+                    $pdf->Image('@' . $logoData, $lx, $drawY, $logoW, $logoH_mm, 'PNG', '', '', false, 300);
+                } catch (\Com\Tecnick\Pdf\Image\Exception $e) {
+                    throw new InvalidArgumentException(
+                        'Unable to render the company logo: ' . $e->getMessage()
+                        . ' Re-upload the PNG logo or disable logo display in Barcode configuration.',
+                        0,
+                        $e
+                    );
+                }
                 $drawY += $logoBlockH;
             }
 

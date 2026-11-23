@@ -64,7 +64,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.3).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.0.4).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 
@@ -96,7 +96,10 @@ GLPI 12 baseline and a newer core revision. Menu callbacks are executed against
 real GLPI classes, and explicit Plugin API calls are checked for availability.
 
 Generation errors use GLPI’s native error controller. Validation messages include
-page-fit measurements; internal failures retain their cause in the GLPI log.
+page-fit measurements; PDF library failures are shown as escaped text in the web error page, and
+other internal failures retain their cause in the GLPI log. Logos are read from
+the fixed plugin data file, validated, and passed as image bytes so external
+data directories such as `/var/lib/glpi/_plugins` work with TCPDF 7.
 CI exercises both successful preview redirects and failed endpoint requests.
 
 Before deployment, verify on a live GLPI 12 test installation: upgrade from

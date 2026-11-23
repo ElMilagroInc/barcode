@@ -13,6 +13,8 @@ jobs:
         php: ['8.3', '8.4', '8.5']
         glpi: ['f5bd5f907158b5990a3b2d9f95e37e57c243a965', '74a89ac1764fa9347e777d63add81e07c635c6b0']
     env:
+      # Model production data under /var/lib, outside TCPDF's default path allowlist.
+      BARCODE_TEST_DOC_ROOT: /dev/shm
       BARCODE_TEST_AUTOLOAD: ${{ github.workspace }}/.glpi/vendor/autoload.php
     steps:
       - uses: actions/checkout@v4

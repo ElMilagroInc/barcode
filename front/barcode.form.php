@@ -28,6 +28,6 @@ try {
     }
     $token = PluginBarcodeBarcode::registerTmpPdf($path);
     return new Symfony\Component\HttpFoundation\RedirectResponse(Html::getPrefixedUrl('/plugins/barcode') . '/front/send.php?token=' . $token);
-} catch (InvalidArgumentException | RuntimeException $e) {
+} catch (Throwable $e) {
     PluginBarcodeLabel::throwGenerationError($e);
 }
