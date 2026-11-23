@@ -26,7 +26,7 @@ class PluginBarcodeConfig extends CommonDBTM
         echo '<nav class="nav nav-tabs mb-3" aria-label="' . PluginBarcodeLabel::escape(__('Barcode plugin configuration', 'barcode')) . '">';
         foreach ($sections as $key => $label) {
             echo '<a class="nav-link' . ($key === $section ? ' active' : '') . '" href="'
-                . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/config.php?section=' . urlencode($key))
+                . PluginBarcodeLabel::escape(Html::getPrefixedUrl('/plugins/barcode') . '/front/config.php?section=' . urlencode($key))
                 . '"' . ($key === $section ? ' aria-current="page"' : '') . '>' . PluginBarcodeLabel::escape($label) . '</a>';
         }
         echo '</nav>';
@@ -43,7 +43,7 @@ class PluginBarcodeConfig extends CommonDBTM
     {
         $settings = PluginBarcodeLabel::settings();
         echo '<form method="post" enctype="multipart/form-data" action="'
-            . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/config.form.php') . '">';
+            . PluginBarcodeLabel::escape(Html::getPrefixedUrl('/plugins/barcode') . '/front/config.form.php') . '">';
         echo '<table class="tab_cadre_fixe"><tr><th colspan="2">'
             . __('Barcode plugin configuration', 'barcode') . '</th></tr>';
         echo '<tr><td>' . __('Default barcode type', 'barcode') . '</td><td>';
@@ -84,7 +84,7 @@ class PluginBarcodeConfig extends CommonDBTM
         if (is_file(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png')) {
             echo '<tr><td colspan="2"><img style="max-width:300px;max-height:100px" alt="'
                 . PluginBarcodeLabel::escape(__('Company logo', 'barcode')) . '" src="'
-                . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/document.send.php?file=barcode/logo.png')
+                . PluginBarcodeLabel::escape(Html::getPrefixedUrl('/plugins/barcode') . '/front/document.send.php?file=barcode/logo.png')
                 . '"><button type="submit" name="dropLogo" value="1" class="btn btn-outline-secondary">'
                 . __('Delete the logo', 'barcode') . '</button></td></tr>';
         }
@@ -116,7 +116,7 @@ class PluginBarcodeConfig extends CommonDBTM
 
         $config = $this->getConfigType($type);
         echo "<form name='form' method='post'
-            action='" . Plugin::getWebDir('barcode') . "/front/config_type.form.php'>";
+            action='" . Html::getPrefixedUrl('/plugins/barcode') . "/front/config_type.form.php'>";
         echo "<input type='hidden' name='type' value='" . PluginBarcodeLabel::escape((string) $type) . "'>";
         echo "<div align='center'>";
         echo "<table class='tab_cadre_fixe' >";

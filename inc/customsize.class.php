@@ -141,7 +141,7 @@ class PluginBarcodeCustomSize extends CommonDBTM
 
         echo "<br>";
         echo "<form name='customsize_form' method='post' action='"
-           . Plugin::getWebDir('barcode') . "/front/customsize.form.php'>";
+           . Html::getPrefixedUrl('/plugins/barcode') . "/front/customsize.form.php'>";
         echo "<div align='center'>";
         echo "<table class='tab_cadre_fixe'>";
 
@@ -226,7 +226,7 @@ class PluginBarcodeCustomSize extends CommonDBTM
         echo "</table>";
         echo "</div>";
         Html::closeForm();
-        Html::printPager($start, $total, Plugin::getWebDir('barcode') . '/front/config.php', 'section=sizes');
+        Html::printPager($start, $total, Html::getPrefixedUrl('/plugins/barcode') . '/front/config.php', 'section=sizes');
     }
 
     // -------------------------------------------------------------------------

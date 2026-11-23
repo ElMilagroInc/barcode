@@ -127,7 +127,7 @@ final class PluginBarcodeLabel
                     throw new RuntimeException('Unable to generate labels.');
                 }
                 $token = PluginBarcodeBarcode::registerTmpPdf($path);
-                $url = Plugin::getWebDir('barcode') . '/front/send.php?token=' . $token;
+                $url = Html::getPrefixedUrl('/plugins/barcode') . '/front/send.php?token=' . $token;
                 Session::addMessageAfterRedirect('<a target="_blank" rel="noopener noreferrer" href="'
                     . self::escape($url) . '">' . __('Open labels to print', 'barcode') . '</a>');
             }
@@ -205,7 +205,7 @@ final class PluginBarcodeLabel
             if (!self::isEnabled($type)) {
                 continue;
             }
-            $url = Plugin::getWebDir('barcode') . '/front/label.php?' . http_build_query([
+            $url = Html::getPrefixedUrl('/plugins/barcode') . '/front/label.php?' . http_build_query([
                 'itemtype' => $item->getType(), 'items_id' => $item->getID(), 'type' => $type,
             ]);
             echo '<a class="btn btn-outline-secondary" target="_blank" rel="noopener noreferrer" href="'

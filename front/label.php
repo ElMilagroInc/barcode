@@ -17,7 +17,7 @@ try {
     }
     if (!empty($options['prompt_settings']) && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         Html::header(__('Generate label', 'barcode'), $_SERVER['PHP_SELF']);
-        echo '<form method="post" action="' . PluginBarcodeLabel::escape(Plugin::getWebDir('barcode') . '/front/label.php') . '">';
+        echo '<form method="post" action="' . PluginBarcodeLabel::escape(Html::getPrefixedUrl('/plugins/barcode') . '/front/label.php') . '">';
         foreach (['itemtype' => $item->getType(), 'items_id' => $item->getID(), 'type' => $type] as $key => $value) {
             echo Html::hidden($key, ['value' => $value]);
         }
@@ -33,7 +33,7 @@ try {
         throw new RuntimeException('No label was generated. Check the label data and page dimensions.');
     }
     $token = PluginBarcodeBarcode::registerTmpPdf($path);
-    return new Symfony\Component\HttpFoundation\RedirectResponse(Plugin::getWebDir('barcode') . '/front/send.php?token=' . $token);
+    return new Symfony\Component\HttpFoundation\RedirectResponse(Html::getPrefixedUrl('/plugins/barcode') . '/front/send.php?token=' . $token);
 } catch (InvalidArgumentException | RuntimeException $e) {
     Html::displayErrorAndDie(PluginBarcodeLabel::escape($e->getMessage()), true);
 }

@@ -46,7 +46,7 @@ class PluginBarcodeQRcode
         $item->check($items_id, READ);
 
         $URLById         = 'URL = ' . $CFG_GLPI['url_base'] . $itemtype::getFormURLWithID($items_id, false);
-        $URLByInvNumber  = 'URL = ' . Plugin::getWebDir('barcode', true, true)
+        $URLByInvNumber  = 'URL = ' . rtrim($CFG_GLPI['url_base'], '/') . '/plugins/barcode'
                            . '/front/checkItemByInv.php?inventoryNumber='
                            . rawurlencode((string) ($item->fields['otherserial'] ?? '')) . '&itemtype=' . rawurlencode($itemtype);
 

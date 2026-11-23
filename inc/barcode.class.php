@@ -46,11 +46,11 @@ class PluginBarcodeBarcode
     {
         return [
             'title'              => self::getTypeName(),
-            'page'               => Plugin::getWebDir('barcode', false) . '/front/barcode.form.php',
+            'page'               => '/plugins/barcode/front/barcode.form.php',
             'icon'               => 'fas fa-barcode',
             'links' => [
-                'add'    => Plugin::getWebDir('barcode', false) . '/front/barcode.form.php',
-                'config' => Plugin::getWebDir('barcode', false) . '/front/config.php',
+                'add'    => '/plugins/barcode/front/barcode.form.php',
+                'config' => '/plugins/barcode/front/config.php',
             ],
         ];
     }
@@ -121,7 +121,7 @@ class PluginBarcodeBarcode
         $ci = PluginBarcodeLabel::loadItem((string) $p_type, (int) $p_ID);
         $code   = PluginBarcodeLabel::escape((string) ($ci->isField('otherserial') ? $ci->getField('otherserial') : ''));
 
-        echo "<form name='form' method='post' target='_blank' action='" . Plugin::getWebDir('barcode') . "/front/barcode.form.php'>";
+        echo "<form name='form' method='post' target='_blank' action='" . Html::getPrefixedUrl('/plugins/barcode') . "/front/barcode.form.php'>";
         echo "<div align='center'><table class='tab_cadre'>";
         echo "<tr><th colspan='4'>" . __('Generation', 'barcode') . "</th></tr>";
         echo "<tr class='tab_bg_1'>";

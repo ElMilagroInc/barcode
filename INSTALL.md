@@ -14,7 +14,7 @@ by GLPI. Uploading a company logo additionally requires PHP GD.
 Upgrading from 2.8 retains the existing database tables, custom sizes and
 `files/_plugins/barcode/logo.png`. New options use GLPI's plugin configuration
 context and have defaults without requiring additional columns. The plugin
-version is 3.0.0 so GLPI can run the existing idempotent migration.
+version is 3.0.1 so GLPI can run the existing idempotent migration.
 
 This release targets GLPI 12. Keep your previous plugin version while running
 GLPI 10 or 11. Do not uninstall to upgrade: uninstall removes plugin tables,
@@ -27,3 +27,4 @@ already contain their generated PDF fonts.
 See [README.md](README.md) for workflows, limits, browser printing behavior and
 validation instructions. Live GLPI install/upgrade and printer testing are
 required before production deployment.
+
