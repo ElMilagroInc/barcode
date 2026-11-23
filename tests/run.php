@@ -258,9 +258,31 @@ try {
     check(PluginBarcodeBarcode::resolveTmpPdf($token) === null, 'Expired token rejected');
     check(PluginBarcodeBarcode::resolveTmpPdf('other-session') === null, 'Unknown token rejected');
     $image = imagecreatetruecolor(200, 60);
+    $white = imagecolorallocate($image, 255, 255, 255);
+    imagefilledrectangle($image, 0, 0, 199, 59, $white);
+    $red = imagecolorallocate($image, 190, 20, 40);
+    imagestring($image, 5, 45, 20, 'TEST LOGO', $red);
     imagepng($image, GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png');
     Config::$settings = ['show_logo' => 1];
     check(is_file($barcode->printPDF(['code' => 'TAG123'])), 'PNG logo above barcode');
+    // The old renderer silently omitted the logo when the symbol was shorter
+    // than its arbitrary 8 mm minimum. Check the PDF image resource, not merely
+    // that some PDF file was produced.
+    CommonDBTM::$rows['maxCodeHeight'] = 10;
+    CommonDBTM::$rows['txtSize'] = 4;
+    CommonDBTM::$rows['txtSpacing'] = 0;
+    Config::$settings = ['show_logo' => 1, 'custom_text' => 'support.el-milagro.net'];
+    $shortLabel = $barcode->printPDF(['code' => 'EMI-0597']);
+    check(preg_match('~/Subtype\s*/Image\b~', file_get_contents($shortLabel)) === 1, 'Short thermal label actually embeds the logo');
+    if (getenv('BARCODE_TEST_LOGO_SAMPLE')) {
+        copy($shortLabel, getenv('BARCODE_TEST_LOGO_SAMPLE'));
+    }
+    Config::$settings['show_logo'] = 0;
+    $withoutLogo = $barcode->printPDF(['code' => 'EMI-0597']);
+    check(preg_match('~/Subtype\s*/Image\b~', file_get_contents($withoutLogo)) === 0, 'Logo switch omits the image resource');
+    CommonDBTM::$rows['maxCodeHeight'] = 70;
+    CommonDBTM::$rows['txtSize'] = 8;
+    CommonDBTM::$rows['txtSpacing'] = 3;
     CommonDBTM::$rows['maxCodeWidth'] = 2000;
     rejects(fn () => $barcode->printPDF(['code' => 'TAG123']), 'Oversized label rejected');
     echo "Passed $count regression checks with real TCPDF.\n";
