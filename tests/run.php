@@ -127,13 +127,6 @@ class Session
         self::$messages[] = $message;
     }
 }
-class Plugin
-{
-    public static function getWebDir(...$args)
-    {
-        return '/plugins/barcode';
-    }
-}
 class TestDB
 {
     public function tableExists($table)
@@ -158,6 +151,7 @@ set_error_handler(static function ($level, $message, $file, $line) {
 });
 $_SESSION = ['glpiID' => 1];
 $CFG_GLPI['url_base'] = 'https://glpi.example.test';
+$CFG_GLPI['root_doc'] = '';
 CommonDBTM::$rows = [
     'id' => 1, 'type' => 'code128', 'size' => 'A4', 'orientation' => 'Portrait',
     'marginTop' => 30, 'marginBottom' => 30, 'marginLeft' => 30, 'marginRight' => 30,
@@ -184,6 +178,16 @@ function rejects(callable $fn, string $message): void
     throw new RuntimeException($message);
 }
 try {
+    $menu = PluginBarcodeBarcode::getMenuContent();
+    check($menu['page'] === '/plugins/barcode/front/barcode.form.php', 'Menu uses canonical plugin route');
+    check($menu['links']['config'] === '/plugins/barcode/front/config.php', 'Configuration menu route');
+    $CFG_GLPI['root_doc'] = '/glpi';
+    check(Html::getPrefixedUrl('/plugins/barcode/front/label.php') === '/glpi/plugins/barcode/front/label.php', 'Direct links retain GLPI subdirectory');
+    $CFG_GLPI['url_base'] = 'https://glpi.example.test/glpi/';
+    $qr = (new PluginBarcodeQRcode())->buildQRcodeData(Computer::class, 1, ['url' => 1, 'inventorynumberURL' => 1]);
+    check(str_contains($qr[0], 'https://glpi.example.test/glpi/plugins/barcode/front/checkItemByInv.php?inventoryNumber=TAG123&itemtype=Computer'), 'QR inventory URL uses absolute canonical route');
+    $CFG_GLPI['url_base'] = 'https://glpi.example.test';
+    $CFG_GLPI['root_doc'] = '';
     $barcode = new PluginBarcodeBarcode();
     foreach (['Code39' => 'TAG123', 'code128' => 'TAG123', 'ean13' => '123456789012',
         'int25' => '123456', 'postnet' => '12345', 'upca' => '12345678901', 'QRcode' => 'https://glpi.example.test'] as $type => $code) {

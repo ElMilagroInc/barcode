@@ -58,7 +58,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.0).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.0.1).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 
@@ -85,7 +85,9 @@ real GLPI 12 TCPDF and Symfony libraries. It checks all seven symbologies,
 input limits, permissions, disabling code families, label geometry, Unicode,
 plain custom text, logo rendering, optional print actions and token lifetime.
 `test:glpi` loads the plugin classes against the real GLPI parent classes.
-CI runs these checks on PHP 8.3, 8.4 and 8.5.
+CI runs these checks on PHP 8.3, 8.4 and 8.5 against both the original
+GLPI 12 baseline and a newer core revision. Menu callbacks are executed against
+real GLPI classes, and explicit Plugin API calls are checked for availability.
 
 Before deployment, verify on a live GLPI 12 test installation: upgrade from
 2.8, fresh install, settings persistence, read-only/entity-restricted profiles,
@@ -93,3 +95,4 @@ header placement on your asset forms, custom-size pagination and the target
 browser/printer's PDF behavior. The isolated tests do not replace those checks.
 
 Original authors and license: see AUTHORS.txt and LICENSE (AGPL-3.0-or-later).
+
