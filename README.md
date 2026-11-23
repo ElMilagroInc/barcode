@@ -64,7 +64,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.2).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.0.3).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 
@@ -94,6 +94,10 @@ plain custom text, logo rendering, optional print actions and token lifetime.
 CI runs these checks on PHP 8.3, 8.4 and 8.5 against both the original
 GLPI 12 baseline and a newer core revision. Menu callbacks are executed against
 real GLPI classes, and explicit Plugin API calls are checked for availability.
+
+Generation errors use GLPI’s native error controller. Validation messages include
+page-fit measurements; internal failures retain their cause in the GLPI log.
+CI exercises both successful preview redirects and failed endpoint requests.
 
 Before deployment, verify on a live GLPI 12 test installation: upgrade from
 2.8, fresh install, settings persistence, read-only/entity-restricted profiles,

@@ -11,6 +11,25 @@ final class PluginBarcodeLabel
         return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+    /** Use GLPI's error controller and preserve the original exception in logs. */
+    public static function throwGenerationError(Throwable $cause): never
+    {
+        // Record/entity authorization failures must keep their original status.
+        if ($cause instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+            throw $cause;
+        }
+        $status = $cause instanceof InvalidArgumentException ? 400 : 500;
+        $error = new \Glpi\Exception\Http\HttpException(
+            $status,
+            'Barcode label generation failed: ' . $cause->getMessage(),
+            $cause
+        );
+        $error->setMessageToDisplay($status === 400
+            ? $cause->getMessage()
+            : __('Unable to generate the label. Check the GLPI error log for details.', 'barcode'));
+        throw $error;
+    }
+
     public static function defaults(): array
     {
         return [

@@ -29,5 +29,5 @@ try {
     $token = PluginBarcodeBarcode::registerTmpPdf($path);
     return new Symfony\Component\HttpFoundation\RedirectResponse(Html::getPrefixedUrl('/plugins/barcode') . '/front/send.php?token=' . $token);
 } catch (InvalidArgumentException | RuntimeException $e) {
-    Html::displayErrorAndDie(PluginBarcodeLabel::escape($e->getMessage()), true);
+    PluginBarcodeLabel::throwGenerationError($e);
 }
