@@ -42,12 +42,18 @@ General settings include:
 - PNG logo above the symbol, with a separate visibility switch. Uploads are
   validated and re-encoded, limited to 2 MiB and 2000 × 2000 pixels. PHP GD is
   required for uploading logos. The logo never overlays the barcode or QR data.
+  Its height is reserved separately above the symbol, including short thermal
+  barcodes. The renderer bounds it to 60% of the label width and 10 mm tall.
 
 Per-symbology pages retain the existing paper size, orientation, margins,
 barcode dimensions, font size and spacing. Dimensions from the legacy plugin
 remain in **points**, while custom paper sizes are in **millimetres**. Layouts
 that cannot fit the selected page are rejected rather than clipped silently.
-Print at actual size (100%) and scan a sample before a production label run.
+The symbol height and text size are honored without forcing taller bars or a
+6-point font. For compact labels, start with a 4-point font and zero text spacing,
+then verify readability on your printer. The logo adds to the total label height;
+if the complete label cannot fit, generation reports an error rather than hiding
+the logo. Print at actual size (100%) and scan a sample before a production run.
 
 PDFs open inline rather than forcing a download. Browser preferences may
 still choose to download PDFs. Preview tokens are session-bound and expire
@@ -58,7 +64,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.1).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.0.2).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 

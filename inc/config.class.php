@@ -88,6 +88,9 @@ class PluginBarcodeConfig extends CommonDBTM
                 . '"><button type="submit" name="dropLogo" value="1" class="btn btn-outline-secondary">'
                 . __('Delete the logo', 'barcode') . '</button></td></tr>';
         }
+        if (!is_file(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png') && !empty($settings['show_logo'])) {
+            echo '<tr><td colspan="2" class="text-warning">' . __('Logo display is enabled, but no logo is uploaded. Upload a PNG below.', 'barcode') . '</td></tr>';
+        }
         echo '<tr><td colspan="2"><input type="file" name="logo" accept="image/png"> PNG, 2 MiB, 2000 × 2000 px maximum</td></tr>';
         echo '<tr><td colspan="2">' . Html::submit(__('Save'), ['name' => 'save']) . '</td></tr></table>';
         Html::closeForm();
@@ -160,16 +163,16 @@ class PluginBarcodeConfig extends CommonDBTM
         echo "<td>" . __('Maximum width', 'barcode') . "</td><td>";
         echo "<input type='text' size='20' name='maxCodeWidth' value='" . PluginBarcodeLabel::escape((string) $config['maxCodeWidth']) . "'>";
         echo "</td>";
-        echo "<td>" . __('Maximum height', 'barcode') . "</td><td>";
+        echo "<td>" . __('Barcode symbol height (points)', 'barcode') . "</td><td>";
         echo "<input type='text' size='20' name='maxCodeHeight' value='" . PluginBarcodeLabel::escape((string) $config['maxCodeHeight']) . "'>";
         echo "</td>";
         echo "</tr>";
         echo "<tr><th colspan='4'>" . __('Text display options', 'barcode') . "</th></tr>";
         echo "<tr class='tab_bg_1'>";
-        echo "<td>" . __('Text size', 'barcode') . "</td><td>";
+        echo "<td>" . __('Text size (points)', 'barcode') . "</td><td>";
         echo "<input type='text' size='20' name='txtSize' value='" . PluginBarcodeLabel::escape((string) $config['txtSize']) . "'>";
         echo "</td>";
-        echo "<td>" . __('Text spacing between lines', 'barcode') . "</td><td>";
+        echo "<td>" . __('Text spacing between lines (points)', 'barcode') . "</td><td>";
         echo "<input type='text' size='20' name='txtSpacing' value='" . PluginBarcodeLabel::escape((string) $config['txtSpacing']) . "'>";
         echo "</td>";
         echo "</tr>";

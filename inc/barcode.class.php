@@ -311,38 +311,27 @@ class PluginBarcodeBarcode
         $logoW    = 0.0;
         $logoH_mm = 0.0;
 
-        // Minimum height reserved for the barcode symbol itself.
-        // Code39 / Code128 / etc. need at least ~8 mm to produce scannable bars.
-        // EAN-13 / UPC-A have an ISO minimum of ~15 mm (handled separately below).
-        // We reserve 60 % of the cell for the barcode, with an absolute floor of
-        // 8 mm, so the logo is scaled down rather than crushing the barcode.
-        $minBarcodeH = max(8.0, $codeH * 0.60);
-        // Maximum space we can give to the logo (+ 1.5 mm gap below it)
-        $logoGap     = 1.5;
-        $maxLogoH    = max(0.0, $codeH - $minBarcodeH - $logoGap);
-
-        if (!empty($settings['show_logo']) && $maxLogoH > 1.0 && file_exists($logoPath)) {
-            $imgInfo = @getimagesize($logoPath);
-            if ($imgInfo && $imgInfo[1] > 0) {
-                $ratio    = $imgInfo[0] / $imgInfo[1];
-                $logoH_mm = min($imgInfo[1] * 0.264583, $maxLogoH); // px → mm at 96 dpi
-                $logoW    = $logoH_mm * $ratio;
-                if ($logoW > $codeW) {
-                    $logoW    = $codeW;
-                    $logoH_mm = $logoW / $ratio;
-                }
-                $hasLogo = ($logoH_mm > 0.5); // skip if scaled to near-zero
+        // The logo has its own space ABOVE the configured symbol height.
+        // A short thermal barcode must not silently suppress the logo or have
+        // its bars enlarged by an unrelated minimum-height rule.
+        $logoGap = 0.5;
+        $maxLogoH = 10.0;
+        $maxLogoW = $codeW * 0.60;
+        if (!empty($settings['show_logo']) && is_file($logoPath)) {
+            $imgInfo = getimagesize($logoPath);
+            if (!$imgInfo || $imgInfo[0] <= 0 || $imgInfo[1] <= 0) {
+                throw new InvalidArgumentException('The stored company logo is invalid. Upload a PNG logo again in Barcode configuration.');
             }
+            $ratio = $imgInfo[0] / $imgInfo[1];
+            $logoW = min($maxLogoW, $maxLogoH * $ratio);
+            $logoH_mm = $logoW / $ratio;
+            $hasLogo = true;
         }
-
-        // Vertical space available for the barcode symbol within the cell.
-        // The logo (if any) and its gap are now guaranteed to leave at least
-        // $minBarcodeH mm for the actual bars.
-        $barcodeAreaH = $codeH - ($hasLogo ? $logoH_mm + $logoGap : 0.0);
-        $barcodeAreaH = max($minBarcodeH, $barcodeAreaH);
-
-        // Pre-compute text block height for consistent grid rows
-        $lineH    = $txtPt * 0.352778 + 1.0; // pt → mm + 1 mm leading
+        $logoBlockH = $hasLogo ? $logoH_mm + $logoGap : 0.0;
+        $barcodeAreaH = $codeH;
+        $symbolBlockH = $logoBlockH + $codeH;
+        $textGap = 0.5;
+        $lineH = $txtPt * $pt2mm;
         // ── Initialise TCPDF document ─────────────────────────────────────────────
         // If the requested size matches a row in glpi_plugin_barcode_customsizes,
         // pass its dimensions to TCPDF as a [width, height] array (in mm). When
@@ -364,7 +353,9 @@ class PluginBarcodeBarcode
         $pageW = $pdf->GetPageWidth();
         $pageH = $pdf->GetPageHeight();
 
-        $pdf->SetFont('dejavusans', '', max(6.0, $txtPt));
+        $pdf->SetFont('dejavusans', '', $txtPt);
+        $pdf->setCellHeightRatio(1.0);
+        $pdf->setCellPaddings(0, 0, 0, 0);
         $textHeights = [];
         foreach ($displayDataCollection as $index => $lines) {
             $textHeights[$index] = 0.0;
@@ -372,7 +363,8 @@ class PluginBarcodeBarcode
                 $textHeights[$index] += max($lineH, $pdf->getStringHeight($codeW, (string) $line)) + $txtSp;
             }
         }
-        $cellH = $codeH + (empty($textHeights) ? 0.0 : max($textHeights)) + 2.0;
+        $textBlockH = empty($textHeights) ? 0.0 : max($textHeights);
+        $cellH = $symbolBlockH + ($textBlockH > 0 ? $textGap + $textBlockH : 0.0);
         if ($codeW > $pageW - $mLeft - $mRight || $cellH > $pageH - $mTop - $mBottom) {
             throw new InvalidArgumentException('The label does not fit the page. Reduce code size, margins or text, or select a larger page.');
         }
@@ -416,16 +408,13 @@ class PluginBarcodeBarcode
             if ($hasLogo) {
                 $lx = $x + ($codeW - $logoW) / 2.0;
                 $pdf->Image($logoPath, $lx, $drawY, $logoW, $logoH_mm, 'PNG', '', '', false, 300);
-                $drawY += $logoH_mm + 1.5;
+                $drawY += $logoBlockH;
             }
 
             // ── Barcode / QR code (vector, no temp files) ────────────────────────
             if ($type === 'QRcode') {
                 $qrSize = min($codeW, $barcodeAreaH);
                 $qrX    = $x + ($codeW - $qrSize) / 2.0;
-                // 2 mm top quiet zone: shift the QR symbol down inside the cell
-                // so it doesn't touch the logo or the cell border.
-                $qrTopPad = 2.0;
                 $pdf->write2DBarcode(
                     $code,
                     'QRCODE,L',
@@ -441,14 +430,7 @@ class PluginBarcodeBarcode
             } else {
                 $tcpdfType = self::$tcpdfTypeMap[$type] ?? 'C128';
 
-                // ── Minimum height for fixed-ratio symbologies ────────────────────
-                // EAN-13 and UPC-A have an ISO-mandated minimum bar height.
-                // When a logo shrinks $barcodeAreaH below that minimum the bars
-                // become malformed. Enforce a 15 mm floor.
                 $renderH = $barcodeAreaH;
-                if (in_array($tcpdfType, ['EAN13', 'UPCA'], true)) {
-                    $renderH = max($renderH, 15.0);
-                }
 
                 // ── Per-symbology rendering options ────────────────────────────────
                 // POSTNET bars have fixed, proportional widths — they must NOT be
@@ -483,7 +465,7 @@ class PluginBarcodeBarcode
                         'bgcolor'       => false,
                         'text'          => false,
                         'font'          => 'dejavusans',
-                        'fontsize'      => max(6.0, $txtPt),
+                        'fontsize'      => $txtPt,
                         // 0 = no stretch — keeps human-readable text compact and readable
                         'stretchtext'   => 0,
                     ],
@@ -493,8 +475,8 @@ class PluginBarcodeBarcode
 
             // ── Text below symbols, using the same Unicode font for all code types ────
             if ($numLines > 0) {
-                $pdf->SetFont('dejavusans', '', max(6.0, $txtPt));
-                $textY = $y + $codeH + 1.5;
+                $pdf->SetFont('dejavusans', '', $txtPt);
+                $textY = $y + $symbolBlockH + $textGap;
                 foreach ($displayData as $line) {
                     $pdf->SetXY($x, $textY);
                     $height = max($lineH, $pdf->getStringHeight($codeW, (string) $line));
