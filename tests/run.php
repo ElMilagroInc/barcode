@@ -285,6 +285,56 @@ try {
     CommonDBTM::$rows['txtSpacing'] = 3;
     CommonDBTM::$rows['maxCodeWidth'] = 2000;
     rejects(fn () => $barcode->printPDF(['code' => 'TAG123']), 'Oversized label rejected');
+    CommonDBTM::$rows['maxCodeWidth'] = 110;
+    Config::$settings = [];
+    $cause = new InvalidArgumentException('Inventory <tag> is invalid.');
+    try {
+        PluginBarcodeLabel::throwGenerationError($cause);
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 400, 'Validation errors use HTTP 400');
+        check($e->getPrevious() === $cause, 'Original generation error remains in exception chain');
+        check($e->getMessageToDisplay() === $cause->getMessage(), 'Validation message reaches GLPI for Twig escaping');
+    }
+    $cause = new RuntimeException('Internal file path must only reach the log.');
+    try {
+        PluginBarcodeLabel::throwGenerationError($cause);
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 500 && $e->getPrevious() === $cause, 'Server failures preserve their cause');
+        check(!str_contains($e->getMessageToDisplay(), 'Internal file path'), 'Internal failures have a safe user message');
+    }
+    $denied = new \Glpi\Exception\Http\AccessDeniedHttpException('Denied by record permissions.');
+    try {
+        PluginBarcodeLabel::throwGenerationError($denied);
+    } catch (\Glpi\Exception\Http\AccessDeniedHttpException $e) {
+        check($e === $denied && $e->getStatusCode() === 403, 'Existing authorization status is preserved');
+    }
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = ['itemtype' => stdClass::class, 'items_id' => 1, 'type' => 'code128'];
+    try {
+        require dirname(__DIR__) . '/front/label.php';
+        throw new RuntimeException('Invalid item did not fail.');
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 400 && $e->getMessageToDisplay() === 'Invalid item.', 'Asset endpoint exposes original validation error without calling removed Html method');
+    }
+    $_GET = ['itemtype' => Computer::class, 'items_id' => 1, 'type' => 'code128'];
+    $response = require dirname(__DIR__) . '/front/label.php';
+    check($response instanceof Symfony\Component\HttpFoundation\RedirectResponse, 'Asset endpoint still opens a successful preview');
+    CommonDBTM::$rows['maxCodeWidth'] = 2000;
+    try {
+        require dirname(__DIR__) . '/front/label.php';
+        throw new RuntimeException('Oversized label did not fail.');
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 400 && str_contains($e->getMessageToDisplay(), 'available after margins'), 'Asset endpoint reports measured page-fit failure');
+    }
+    CommonDBTM::$rows['maxCodeWidth'] = 110;
+    $_SERVER['REQUEST_METHOD'] = 'POST';
+    $_POST = ['type' => 'Code39', 'code' => 'lowercase', 'nb' => 1];
+    try {
+        require dirname(__DIR__) . '/front/barcode.form.php';
+        throw new RuntimeException('Invalid barcode did not fail.');
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 400 && str_contains($e->getMessageToDisplay(), 'cannot be encoded'), 'Manual printing endpoint exposes original validation error');
+    }
     echo "Passed $count regression checks with real TCPDF.\n";
 } finally {
     foreach (glob(GLPI_TMP_DIR . '/*.pdf') ?: [] as $file) {

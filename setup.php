@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-define("PLUGIN_BARCODE_VERSION", "3.0.2");
+define("PLUGIN_BARCODE_VERSION", "3.0.3");
 
 // Minimal GLPI version, inclusive
 define('PLUGIN_BARCODE_MIN_GLPI', '12.0.0');

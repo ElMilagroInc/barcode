@@ -25,7 +25,7 @@ if ($menu['page'] !== '/plugins/barcode/front/barcode.form.php'
     || Html::getPrefixedUrl($menu['page']) !== '/glpi/plugins/barcode/front/barcode.form.php') {
     throw new RuntimeException('Menu URLs must be canonical paths without a duplicated GLPI prefix.');
 }
-// Check every explicit call to the legacy Plugin class against this real core.
+// Check all explicit static calls to GLPI services against the real core.
 foreach (array_merge(glob(dirname(__DIR__) . '/*.php'), glob(dirname(__DIR__) . '/inc/*.php'), glob(dirname(__DIR__) . '/front/*.php')) as $file) {
     $code = '';
     foreach (token_get_all(file_get_contents($file)) as $token) {
@@ -37,11 +37,11 @@ foreach (array_merge(glob(dirname(__DIR__) . '/*.php'), glob(dirname(__DIR__) . 
             $code .= $token;
         }
     }
-    preg_match_all('/\bPlugin::([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $code, $matches);
-    foreach ($matches[1] as $method) {
-        if (!is_callable([Plugin::class, $method])) {
-            throw new RuntimeException('Unsupported Plugin::' . $method . '() in ' . basename($file));
+    preg_match_all('/\b(Plugin|Html|Session|Dropdown|Config|ProfileRight|DBConnection|Toolbox)::([A-Za-z_][A-Za-z0-9_]*)\s*\(/', $code, $matches, PREG_SET_ORDER);
+    foreach ($matches as [, $class, $method]) {
+        if (!is_callable([$class, $method])) {
+            throw new RuntimeException('Unsupported ' . $class . '::' . $method . '() in ' . basename($file));
         }
     }
 }
-echo "Menu callback and Plugin API calls are compatible.\n";
+echo "Menu callback and GLPI static API calls are compatible.\n";

@@ -366,7 +366,13 @@ class PluginBarcodeBarcode
         $textBlockH = empty($textHeights) ? 0.0 : max($textHeights);
         $cellH = $symbolBlockH + ($textBlockH > 0 ? $textGap + $textBlockH : 0.0);
         if ($codeW > $pageW - $mLeft - $mRight || $cellH > $pageH - $mTop - $mBottom) {
-            throw new InvalidArgumentException('The label does not fit the page. Reduce code size, margins or text, or select a larger page.');
+            throw new InvalidArgumentException(sprintf(
+                'The complete label (including logo and text) needs %.2f × %.2f mm, but only %.2f × %.2f mm is available after margins. Reduce barcode size, text, or margins, or select a larger page.',
+                $codeW,
+                $cellH,
+                max(0.0, $pageW - $mLeft - $mRight),
+                max(0.0, $pageH - $mTop - $mBottom)
+            ));
         }
         // ── Render loop ──────────────────────────────────────────────────────
         $x     = $mLeft;
