@@ -77,6 +77,14 @@ class Computer extends CommonDBTM
         return true;
     }
 }
+// Inject the real PDF library exception at the endpoint's service boundary.
+class PdfFailureComputer extends Computer
+{
+    public function check($id, $right)
+    {
+        throw new \Com\Tecnick\Pdf\Image\Exception('Unable to read image file: logo.png');
+    }
+}
 class CommonITILObject extends CommonDBTM
 {
 }
@@ -137,8 +145,15 @@ class TestDB
 $DB = new TestDB();
 require $autoload;
 define('GLPI_TMP_DIR', sys_get_temp_dir() . '/barcode-tests-' . bin2hex(random_bytes(4)));
-define('GLPI_PLUGIN_DOC_DIR', GLPI_TMP_DIR);
-mkdir(GLPI_TMP_DIR . '/barcode', 0700, true);
+// Put plugin data outside TCPDF's allowed paths when requested by CI.
+$docRoot = getenv('BARCODE_TEST_DOC_ROOT');
+define('GLPI_PLUGIN_DOC_DIR', $docRoot
+    ? rtrim($docRoot, '/') . '/barcode-doc-tests-' . bin2hex(random_bytes(4))
+    : GLPI_TMP_DIR);
+if (!is_dir(GLPI_TMP_DIR)) {
+    mkdir(GLPI_TMP_DIR, 0700, true);
+}
+mkdir(GLPI_PLUGIN_DOC_DIR . '/barcode', 0700, true);
 require dirname(__DIR__) . '/setup.php';
 foreach (['config_type', 'customsize', 'config', 'barcode', 'qrcode', 'profile', 'label'] as $class) {
     require dirname(__DIR__) . '/inc/' . $class . '.class.php';
@@ -286,7 +301,36 @@ try {
     CommonDBTM::$rows['maxCodeWidth'] = 2000;
     rejects(fn () => $barcode->printPDF(['code' => 'TAG123']), 'Oversized label rejected');
     CommonDBTM::$rows['maxCodeWidth'] = 110;
+    Config::$settings = ['show_logo' => 1];
+    $originalLogo = file_get_contents(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png');
+    file_put_contents(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png', 'not a PNG');
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_GET = ['itemtype' => Computer::class, 'items_id' => 1, 'type' => 'code128'];
+    try {
+        require dirname(__DIR__) . '/front/label.php';
+        throw new RuntimeException('Invalid logo was not rejected.');
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getStatusCode() === 400 && str_contains($e->getMessageToDisplay(), 'Re-upload the logo'), 'Invalid logo errors reach the web error page with a remedy');
+    }
+    Config::$settings['show_logo'] = 0;
+    check(is_file($barcode->printPDF(['code' => 'EMI-0597'])), 'Disabling a broken logo restores PDF generation');
+    file_put_contents(GLPI_PLUGIN_DOC_DIR . '/barcode/logo.png', $originalLogo);
     Config::$settings = [];
+    $pdfCause = new \Com\Tecnick\Pdf\Image\Exception('Unable to read image file: logo.png');
+    try {
+        PluginBarcodeLabel::throwGenerationError($pdfCause);
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getMessageToDisplay() === $pdfCause->getMessage(), 'Native PDF exceptions are visible in the web instance');
+        check($e->getPrevious() === $pdfCause, 'Native PDF failure remains in logs');
+    }
+    $_GET = ['itemtype' => PdfFailureComputer::class, 'items_id' => 1, 'type' => 'code128'];
+    try {
+        require dirname(__DIR__) . '/front/label.php';
+        throw new RuntimeException('Native PDF exception was not handled.');
+    } catch (\Glpi\Exception\Http\HttpException $e) {
+        check($e->getMessageToDisplay() === 'Unable to read image file: logo.png', 'Asset endpoint displays PDF exceptions which do not extend RuntimeException');
+        check($e->getPrevious() instanceof \Com\Tecnick\Pdf\Image\Exception, 'Asset endpoint preserves the native image cause');
+    }
     $cause = new InvalidArgumentException('Inventory <tag> is invalid.');
     try {
         PluginBarcodeLabel::throwGenerationError($cause);
@@ -340,9 +384,12 @@ try {
     foreach (glob(GLPI_TMP_DIR . '/*.pdf') ?: [] as $file) {
         unlink($file);
     }
-    foreach (glob(GLPI_TMP_DIR . '/barcode/*') ?: [] as $file) {
+    foreach (glob(GLPI_PLUGIN_DOC_DIR . '/barcode/*') ?: [] as $file) {
         unlink($file);
     }
-    rmdir(GLPI_TMP_DIR . '/barcode');
+    rmdir(GLPI_PLUGIN_DOC_DIR . '/barcode');
+    if (GLPI_PLUGIN_DOC_DIR !== GLPI_TMP_DIR) {
+        rmdir(GLPI_PLUGIN_DOC_DIR);
+    }
     rmdir(GLPI_TMP_DIR);
 }

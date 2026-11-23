@@ -24,7 +24,8 @@ final class PluginBarcodeLabel
             'Barcode label generation failed: ' . $cause->getMessage(),
             $cause
         );
-        $error->setMessageToDisplay($status === 400
+        $isPdfError = str_starts_with($cause::class, 'Com\\Tecnick\\');
+        $error->setMessageToDisplay($status === 400 || $isPdfError
             ? $cause->getMessage()
             : __('Unable to generate the label. Check the GLPI error log for details.', 'barcode'));
         throw $error;
