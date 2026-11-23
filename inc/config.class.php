@@ -66,6 +66,13 @@ class PluginBarcodeConfig extends CommonDBTM
         }
         echo '<tr><td>' . __('Custom text below codes (plain text)', 'barcode') . '</td><td><textarea name="custom_text" class="form-control" maxlength="500" rows="3">'
             . PluginBarcodeLabel::escape((string) $settings['custom_text']) . '</textarea></td></tr>';
+        echo '<tr><td>' . __('Custom text size (points; 0 = asset text size)', 'barcode')
+            . '</td><td><input type="number" name="custom_text_size" min="0" max="72" step="0.25" value="'
+            . PluginBarcodeLabel::escape((string) $settings['custom_text_size']) . '"></td></tr>';
+        echo '<tr><td>' . __('Gap before custom text (points)', 'barcode')
+            . '</td><td><input type="number" name="custom_text_gap" min="0" max="72" step="0.25" value="'
+            . PluginBarcodeLabel::escape((string) $settings['custom_text_gap']) . '"></td></tr>';
+        echo '<tr><td colspan="2">' . __('Use a smaller custom text size and a zero gap to place it directly below the asset number. These controls also apply below QR display text.', 'barcode') . '</td></tr>';
         echo '<tr><td colspan="2">' . __('Automatic printing depends on the browser PDF viewer. Text is printed literally; HTML and template expressions are not evaluated.', 'barcode') . '</td></tr>';
         echo '<tr><th colspan="2">' . __('QR code defaults: encode / display', 'barcode') . '</th></tr>';
         foreach ([

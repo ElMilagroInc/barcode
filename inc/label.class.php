@@ -37,6 +37,7 @@ final class PluginBarcodeLabel
             'enable_barcode' => 1, 'enable_qrcode' => 1,
             'prompt_settings' => 0, 'auto_print' => 0,
             'show_logo' => 1, 'custom_text' => '',
+            'custom_text_size' => 0, 'custom_text_gap' => 0,
             'serialnumber' => 1, 'displayserialnumber' => 0,
             'inventorynumber' => 1, 'displayinventorynumber' => 1,
             'id' => 1, 'displayid' => 0, 'uuid' => 0, 'displayuuid' => 0,
@@ -44,6 +45,24 @@ final class PluginBarcodeLabel
             'inventorynumberURL' => 0, 'qrcodedate' => 0, 'displayqrcodedate' => 0,
             'border' => 0, 'displaylabels' => 0,
         ];
+    }
+
+    /** Sizes and gaps are points; zero font size inherits the asset text size. */
+    public static function validateTextOptions(array $input): array
+    {
+        $values = [];
+        foreach (['custom_text_size', 'custom_text_gap'] as $key) {
+            $raw = str_replace(',', '.', trim((string) ($input[$key] ?? '0')));
+            $value = filter_var($raw, FILTER_VALIDATE_FLOAT);
+            if ($value === false || !is_finite($value) || $value < 0 || $value > 72
+                || ($key === 'custom_text_size' && $value > 0 && $value < 1)) {
+                throw new InvalidArgumentException($key === 'custom_text_size'
+                    ? 'Custom text size must be 0 (inherit) or between 1 and 72 points.'
+                    : 'Custom text gap must be between 0 and 72 points.');
+            }
+            $values[$key] = $value;
+        }
+        return $values;
     }
 
     public static function settings(): array

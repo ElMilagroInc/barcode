@@ -276,8 +276,7 @@ class PluginBarcodeBarcode
         foreach ($codes as $index => $code) {
             $displayDataCollection[$index] = array_merge(
                 $type === 'QRcode' ? [] : [(string) $code],
-                $displayDataCollection[$index] ?? [],
-                $customLines
+                $displayDataCollection[$index] ?? []
             );
         }
 
@@ -299,6 +298,9 @@ class PluginBarcodeBarcode
         $mRight  = max(0.0, (float) $cfg['marginRight']      * $pt2mm);
         $txtPt   = max(4.0, (float) ($cfg['txtSize']    ?? 6));          // pt — no conversion
         $txtSp   = max(0.0, (float) ($cfg['txtSpacing'] ?? 3) * $pt2mm); // pt → mm
+        $customOptions = PluginBarcodeLabel::validateTextOptions($settings);
+        $customPt = $customOptions['custom_text_size'] > 0 ? $customOptions['custom_text_size'] : $txtPt;
+        $customGap = $customOptions['custom_text_gap'] * $pt2mm;
 
         // ── Load TCPDF from GLPI vendor directory ────────────────────────────────
         // GLPI 12 bundles TCPDF at this path.
@@ -354,7 +356,6 @@ class PluginBarcodeBarcode
         $barcodeAreaH = $codeH;
         $symbolBlockH = $logoBlockH + $codeH;
         $textGap = 0.5;
-        $lineH = $txtPt * $pt2mm;
         // ── Initialise TCPDF document ─────────────────────────────────────────────
         // If the requested size matches a row in glpi_plugin_barcode_customsizes,
         // pass its dimensions to TCPDF as a [width, height] array (in mm). When
@@ -379,14 +380,12 @@ class PluginBarcodeBarcode
         $pdf->SetFont('dejavusans', '', $txtPt);
         $pdf->setCellHeightRatio(1.0);
         $pdf->setCellPaddings(0, 0, 0, 0);
-        $textHeights = [];
+        $textLayouts = [];
+        $textBlockH = 0.0;
         foreach ($displayDataCollection as $index => $lines) {
-            $textHeights[$index] = 0.0;
-            foreach ($lines as $line) {
-                $textHeights[$index] += max($lineH, $pdf->getStringHeight($codeW, (string) $line)) + $txtSp;
-            }
+            $textLayouts[$index] = self::layoutText($pdf, $codeW, $lines, $customLines, $txtPt, $txtSp, $customPt, $customGap);
+            $textBlockH = max($textBlockH, $textLayouts[$index]['height']);
         }
-        $textBlockH = empty($textHeights) ? 0.0 : max($textHeights);
         $cellH = $symbolBlockH + ($textBlockH > 0 ? $textGap + $textBlockH : 0.0);
         if ($codeW > $pageW - $mLeft - $mRight || $cellH > $pageH - $mTop - $mBottom) {
             throw new InvalidArgumentException(sprintf(
@@ -404,9 +403,6 @@ class PluginBarcodeBarcode
 
         foreach ($codes as $ia => $code) {
             $code        = (string) $code;
-            $displayData = (isset($displayDataCollection[$ia]) && is_array($displayDataCollection[$ia]))
-                           ? $displayDataCollection[$ia] : [];
-            $numLines    = count($displayData);
             $thisCellH = $cellH;
 
             // Advance position before drawing (skip on very first item)
@@ -511,16 +507,12 @@ class PluginBarcodeBarcode
                 );
             }
 
-            // ── Text below symbols, using the same Unicode font for all code types ────
-            if ($numLines > 0) {
-                $pdf->SetFont('dejavusans', '', $txtPt);
-                $textY = $y + $symbolBlockH + $textGap;
-                foreach ($displayData as $line) {
-                    $pdf->SetXY($x, $textY);
-                    $height = max($lineH, $pdf->getStringHeight($codeW, (string) $line));
-                    $pdf->MultiCell($codeW, $height, (string) $line, 0, 'C', false, 0);
-                    $textY += $height + $txtSp;
-                }
+            // Use the exact font sizes and positions measured before placing rows.
+            $textY = $y + $symbolBlockH + $textGap;
+            foreach ($textLayouts[$ia]['runs'] as $run) {
+                $pdf->SetFont('dejavusans', '', $run['size']);
+                $pdf->SetXY($x, $textY + $run['y']);
+                $pdf->MultiCell($codeW, $run['height'], $run['text'], 0, 'C', false, 0);
             }
 
             // ── Border ───────────────────────────────────────────────────────────
@@ -565,6 +557,36 @@ class PluginBarcodeBarcode
         }
 
         return $pdfPath;   // absolute path — served by the session-bound preview endpoint
+    }
+
+    /** Measure both text blocks once so custom styling also participates in page fit. */
+    public static function layoutText(
+        TCPDF $pdf,
+        float $width,
+        array $assetLines,
+        array $customLines,
+        float $assetSize,
+        float $assetSpacing,
+        float $customSize,
+        float $customGap
+    ): array {
+        $runs = [];
+        $cursor = 0.0;
+        foreach ([[$assetLines, $assetSize, $assetSpacing], [$customLines, $customSize, 0.0]] as $block => [$lines, $size, $spacing]) {
+            if ($block === 1 && $lines !== [] && $runs !== []) {
+                $cursor += $customGap;
+            }
+            $pdf->SetFont('dejavusans', '', $size);
+            foreach (array_values($lines) as $index => $line) {
+                if ($index > 0) {
+                    $cursor += $spacing;
+                }
+                $height = max($size * 0.352778, $pdf->getStringHeight($width, (string) $line));
+                $runs[] = ['text' => (string) $line, 'size' => $size, 'height' => $height, 'y' => $cursor];
+                $cursor += $height;
+            }
+        }
+        return ['runs' => $runs, 'height' => $cursor];
     }
 
     // -------------------------------------------------------------------------

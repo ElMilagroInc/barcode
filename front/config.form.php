@@ -20,7 +20,7 @@ try {
         if (!in_array($type, (new PluginBarcodeBarcode())->getCodeTypes(), true)) {
             throw new InvalidArgumentException('Invalid barcode type.');
         }
-        $values = [];
+        $values = PluginBarcodeLabel::validateTextOptions($_POST);
         foreach (PluginBarcodeLabel::defaults() as $key => $default) {
             if ($key === 'custom_text') {
                 $text = str_replace("\r\n", "\n", trim((string) ($_POST[$key] ?? '')));
@@ -28,6 +28,8 @@ try {
                     throw new InvalidArgumentException('Custom text is limited to 500 characters and five lines.');
                 }
                 $values[$key] = $text;
+            } elseif (array_key_exists($key, $values)) {
+                continue;
             } else {
                 $values[$key] = (int) (($_POST[$key] ?? 0) === '1');
             }
