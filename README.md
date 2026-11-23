@@ -26,7 +26,10 @@ available under Tools → Barcode.
 
 Open Setup → Plugins → Barcode → Configuration. Settings are split into
 General, one page per symbology, and Custom label sizes. Custom sizes use GLPI's
-pager and the user's page-length preference.
+pager and the user's page-length preference. Custom paper names retain their
+stored spelling when selected and saved; values uppercased by earlier versions
+are matched back to the actual dropdown option. Saving a symbology displays a
+success message or the reason the save failed.
 
 General settings include:
 
@@ -64,7 +67,7 @@ reusable during that hour for PDF viewer reloads and printing.
 
 1. Deploy this directory as `plugins/barcode` or `marketplace/barcode` on a
    GLPI 12 installation, retaining the existing plugin data directory.
-2. Run the Barcode upgrade in Setup → Plugins (version 3.0.4).
+2. Run the Barcode upgrade in Setup → Plugins (version 3.0.5).
 3. Review General settings and each symbology's layout, then print and scan a
    sample label. Existing type settings, custom sizes and `logo.png` are retained.
 

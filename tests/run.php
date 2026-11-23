@@ -17,6 +17,7 @@ class CommonDBTM extends CommonGLPI
 {
     public array $fields = [];
     public static array $rows = [];
+    public static bool $updateResult = true;
     public static function getTable($classname = null)
     {
         return 'test';
@@ -33,6 +34,15 @@ class CommonDBTM extends CommonGLPI
     public function getFromDBByCrit($criteria)
     {
         return $this->getFromDB(1);
+    }
+    public function update(array $input)
+    {
+        if (!self::$updateResult) {
+            return false;
+        }
+        self::$rows = array_replace(self::$rows, $input);
+        $this->fields = self::$rows;
+        return true;
     }
     public function getEmpty()
     {
@@ -137,9 +147,18 @@ class Session
 }
 class TestDB
 {
+    public array $customSizes = [];
     public function tableExists($table)
     {
-        return false;
+        return $table === 'glpi_plugin_barcode_customsizes' && $this->customSizes !== [];
+    }
+    public function request(array $query)
+    {
+        $rows = $this->customSizes;
+        if (isset($query['WHERE']['name'])) {
+            $rows = array_values(array_filter($rows, static fn ($row) => $row['name'] === $query['WHERE']['name']));
+        }
+        return $rows;
     }
 }
 $DB = new TestDB();
@@ -379,6 +398,43 @@ try {
     } catch (\Glpi\Exception\Http\HttpException $e) {
         check($e->getStatusCode() === 400 && str_contains($e->getMessageToDisplay(), 'cannot be encoded'), 'Manual printing endpoint exposes original validation error');
     }
+    // Round-trip a mixed-case custom paper name through the actual save endpoint.
+    $DB->customSizes = [['id' => 1, 'name' => 'Thermal_66x16', 'width_mm' => 66, 'height_mm' => 16]];
+    check(PluginBarcodeBarcode::validatePageSize('Thermal_66x16') === 'Thermal_66x16', 'Custom paper names keep their exact dropdown spelling');
+    check(PluginBarcodeBarcode::validatePageSize('THERMAL_66X16') === 'Thermal_66x16', 'Previously uppercased paper names resolve to the stored name');
+    check(PluginBarcodeBarcode::validatePageSize('a4') === 'A4', 'Built-in paper formats still normalize to uppercase');
+    rejects(fn () => PluginBarcodeBarcode::validatePageSize('Deleted-size'), 'Unknown custom paper is rejected');
+    CommonDBTM::$rows = array_replace(CommonDBTM::$rows, [
+        'type' => 'code128', 'size' => 'A4', 'orientation' => 'Landscape',
+        'marginTop' => 0, 'marginBottom' => 0, 'marginLeft' => 0, 'marginRight' => 0,
+        'marginHorizontal' => 0, 'marginVertical' => 0, 'maxCodeHeight' => 10,
+        'maxCodeWidth' => 110, 'txtSize' => 4, 'txtSpacing' => 0,
+    ]);
+    $_POST = array_map('strval', CommonDBTM::$rows);
+    $_POST['size'] = 'Thermal_66x16';
+    Session::$messages = [];
+    try {
+        require dirname(__DIR__) . '/front/config_type.form.php';
+    } catch (\Glpi\Exception\RedirectException $e) {
+        check($e->getResponse()->getStatusCode() === 302, 'Paper settings save redirects back');
+    }
+    $saved = (new PluginBarcodeConfig())->getConfigType('code128');
+    check($saved['size'] === 'Thermal_66x16', 'Selected custom paper survives saving and reloading');
+    check(array_key_exists($saved['size'], PluginBarcodeCustomSize::getDropdownOptions()), 'Saved paper matches an actual dropdown option');
+    check(in_array('Barcode settings saved.', Session::$messages, true), 'Settings save displays success feedback');
+    ob_start();
+    $barcode->showSizeSelect('THERMAL_66X16');
+    $dropdownHtml = ob_get_clean();
+    check(str_contains($dropdownHtml, "value='Thermal_66x16' selected"), 'Real GLPI dropdown selects previously uppercased custom paper');
+    check(is_file($barcode->printPDF(array_replace($saved, ['code' => 'EMI-0597']))), 'Saved custom paper is usable for generation');
+    CommonDBTM::$updateResult = false;
+    Session::$messages = [];
+    try {
+        require dirname(__DIR__) . '/front/config_type.form.php';
+    } catch (\Glpi\Exception\RedirectException $e) {
+        check(str_contains(implode(' ', Session::$messages), 'Unable to save the barcode settings'), 'Failed database save is reported instead of silently reverting');
+    }
+    CommonDBTM::$updateResult = true;
     echo "Passed $count regression checks with real TCPDF.\n";
 } finally {
     foreach (glob(GLPI_TMP_DIR . '/*.pdf') ?: [] as $file) {

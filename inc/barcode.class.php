@@ -99,6 +99,16 @@ class PluginBarcodeBarcode
         ];
 
         $sizes += PluginBarcodeCustomSize::getDropdownOptions();
+        // Earlier releases uppercased custom names on save. Select the actual
+        // option key so those existing settings remain visible and editable.
+        if ($p_size !== null) {
+            foreach (array_keys($sizes) as $name) {
+                if (strcasecmp((string) $name, (string) $p_size) === 0) {
+                    $p_size = (string) $name;
+                    break;
+                }
+            }
+        }
 
         Dropdown::showFromArray(
             "size",
@@ -593,11 +603,19 @@ class PluginBarcodeBarcode
 
     public static function validatePageSize(string $size): string
     {
-        if (!PluginBarcodeCustomSize::isReservedName($size)
-           && PluginBarcodeCustomSize::resolveDimensions($size) === null) {
-            throw new InvalidArgumentException('Unknown page size.');
+        $size = trim($size);
+        if (PluginBarcodeCustomSize::isReservedName($size)) {
+            return strtoupper($size);
         }
-        return strtoupper($size);
+        // A custom name is also the exact dropdown key. Preserve the stored
+        // spelling, including when repairing values uppercased by 3.0.0–3.0.4.
+        foreach (PluginBarcodeCustomSize::getDropdownOptions() as $name => $label) {
+            $name = (string) $name;
+            if (strcasecmp($size, $name) === 0 && PluginBarcodeCustomSize::resolveDimensions($name) !== null) {
+                return $name;
+            }
+        }
+        throw new InvalidArgumentException('Unknown page size.');
     }
 
     public static function validateCode(string $type, string $code): void

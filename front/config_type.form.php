@@ -29,11 +29,15 @@ try {
         throw new InvalidArgumentException('Invalid orientation.');
     }
     $config = new PluginBarcodeConfigType();
-    if ($config->getFromDBByCrit(['type' => $type])) {
-        $input['id'] = $config->getID();
-        $config->update($input);
+    if (!$config->getFromDBByCrit(['type' => $type])) {
+        throw new RuntimeException('Settings for this code type are missing. Run the Barcode plugin upgrade and try again.');
     }
-} catch (InvalidArgumentException $e) {
+    $input['id'] = $config->getID();
+    if (!$config->update($input)) {
+        throw new RuntimeException('Unable to save the barcode settings. Check the GLPI error log for details.');
+    }
+    Session::addMessageAfterRedirect(__('Barcode settings saved.', 'barcode'));
+} catch (InvalidArgumentException | RuntimeException $e) {
     Session::addMessageAfterRedirect(PluginBarcodeLabel::escape($e->getMessage()), false, ERROR);
 }
 Html::back();
